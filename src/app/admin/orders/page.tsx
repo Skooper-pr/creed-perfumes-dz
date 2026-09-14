@@ -19,10 +19,19 @@ import {
   AlertCircle,
   FileSpreadsheet,
   Download,
-  Trash2
+  Trash2,
+  Send,
+  Printer,
+  RefreshCw,
+  ExternalLink
 } from 'lucide-react';
 import { getOrders, updateOrderStatus, deleteOrder, subscribeToStoreChanges } from '@/lib/store';
 import { exportOrdersToExcel } from '@/lib/exportOrders';
+import { 
+  dispatchOrderToDelivery, 
+  syncDeliveryTracking, 
+  openPrintableShippingLabel 
+} from '@/lib/delivery/manager';
 import { Order, OrderStatus } from '@/types';
 import { ALGERIA_WILAYAS } from '@/data/wilayas';
 
@@ -34,6 +43,8 @@ export default function AdminOrdersPage() {
   const [selectedWilaya, setSelectedWilaya] = useState<string>('all');
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [syncingAll, setSyncingAll] = useState(false);
 
   const loadOrders = async () => {
     try {
@@ -51,6 +62,78 @@ export default function AdminOrdersPage() {
     const unsubscribe = subscribeToStoreChanges(loadOrders);
     return () => unsubscribe();
   }, []);
+
+  const handleDispatchOrder = async (order: Order) => {
+    setActionLoadingId(order.id);
+    try {
+      const res = await dispatchOrderToDelivery(order);
+      if (res.success) {
+        setStatusNotice(`تم إرسال الطلبية بنجاح إلى شركة التوصيل (${res.provider})! رقم التتبع: ${res.tracking_number}`);
+        setTimeout(() => setStatusNotice(null), 6000);
+        await loadOrders();
+        if (activeOrder && activeOrder.id === order.id) {
+          setActiveOrder((prev) => prev ? {
+            ...prev,
+            status: 'shipped',
+            tracking_number: res.tracking_number,
+            delivery_provider: res.provider,
+            delivery_tracking_url: res.tracking_url,
+            delivery_status_raw: res.raw_status,
+          } : null);
+        }
+      } else {
+        alert(res.error || 'حدث خطأ أثناء الاتصال بشركة التوصيل.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('تعذر إرسال الشحنة لشركة التوصيل. يرجى التحقق من الإعدادات.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleSyncOrder = async (order: Order) => {
+    setActionLoadingId(order.id);
+    try {
+      const res = await syncDeliveryTracking(order);
+      setStatusNotice(`حالة التتبع الحالية لدى شركة التوصيل (${order.tracking_number}): ${res.rawStatus}`);
+      setTimeout(() => setStatusNotice(null), 5000);
+      await loadOrders();
+      if (activeOrder && activeOrder.id === order.id) {
+        setActiveOrder((prev) => prev ? {
+          ...prev,
+          status: res.newStatus || prev.status,
+          delivery_status_raw: res.rawStatus,
+        } : null);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleSyncAllActive = async () => {
+    const shippedOrTracked = orders.filter(o => o.status === 'shipped' || !!o.tracking_number);
+    if (shippedOrTracked.length === 0) {
+      alert('لا توجد حالياً أي طلبيات قيد الشحن أو بأرقام تتبع لمزامنتها.');
+      return;
+    }
+    setSyncingAll(true);
+    let count = 0;
+    for (const ord of shippedOrTracked) {
+      try {
+        await syncDeliveryTracking(ord);
+        count++;
+      } catch (err) {
+        console.warn(err);
+      }
+    }
+    await loadOrders();
+    setSyncingAll(false);
+    setStatusNotice(`تمت مزامنة بيانات ${count} شحنة حية مع شركة التوصيل بنجاح.`);
+    setTimeout(() => setStatusNotice(null), 5000);
+  };
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     if (newStatus === 'delivered') {
@@ -170,6 +253,17 @@ export default function AdminOrdersPage() {
               <span>الكل ({orders.length})</span>
             </button>
           )}
+
+          {/* Sync Live Delivery API Button */}
+          <button
+            onClick={handleSyncAllActive}
+            disabled={syncingAll}
+            className="btn-pill bg-blue-600 hover:bg-blue-700 text-white text-xs py-2.5 px-3.5 font-bold flex items-center gap-1.5 shadow-sm transition-all"
+            title="مزامنة وتحديث حالات جميع الطرود قيد الشحن فورياً مع شركة التوصيل (Yalidine/ZR Express API)"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${syncingAll ? 'animate-spin' : ''}`} />
+            <span>{syncingAll ? 'جاري المزامنة...' : 'مزامنة الشحنات الحية (API)'}</span>
+          </button>
         </div>
       </div>
 
@@ -362,6 +456,42 @@ export default function AdminOrdersPage() {
                     <div className="text-[11px] text-on-surface-variant line-clamp-1 pt-0.5">
                       العطور: {order.items.map(i => `${i.name} (${i.qty})`).join('، ')}
                     </div>
+
+                    {/* Delivery & Tracking Badge snippet */}
+                    {order.tracking_number ? (
+                      <div className="flex flex-wrap items-center gap-2 pt-1.5">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-900 border border-blue-200 text-[11px] font-bold">
+                          <Truck className="w-3 h-3 text-blue-600 shrink-0" />
+                          <span className="uppercase">{order.delivery_provider === 'zr_express' ? 'ZR Express' : 'Yalidine'}</span>
+                          <span className="font-mono font-black" dir="ltr">{order.tracking_number}</span>
+                        </span>
+                        {order.delivery_status_raw && (
+                          <span className="text-[10px] text-blue-800 bg-blue-50/50 px-2 py-0.5 rounded border border-blue-100">
+                            {order.delivery_status_raw}
+                          </span>
+                        )}
+                        <button
+                          onClick={() => openPrintableShippingLabel(order)}
+                          className="text-[11px] font-bold text-purple-700 hover:text-purple-900 flex items-center gap-1 bg-purple-50 hover:bg-purple-100 px-2 py-0.5 rounded transition-colors border border-purple-200"
+                          title="طباعة بوليصة الشحن (Bordereau)"
+                        >
+                          <Printer className="w-3 h-3" />
+                          <span>بوليصة</span>
+                        </button>
+                      </div>
+                    ) : (order.status === 'confirmed' || order.status === 'pending') ? (
+                      <div className="pt-1.5">
+                        <button
+                          onClick={() => handleDispatchOrder(order)}
+                          disabled={actionLoadingId === order.id}
+                          className="btn-pill bg-purple-700 hover:bg-purple-800 text-white text-[11px] py-1 px-2.5 font-bold flex items-center gap-1 shadow-sm transition-all"
+                          title="إرسال الطلبية لشركة التوصيل وتوليد رقم التتبع وبوليصة الشحن بنقرة واحدة"
+                        >
+                          <Send className="w-3 h-3" />
+                          <span>{actionLoadingId === order.id ? 'جاري الإرسال...' : 'إرسال لشركة التوصيل'}</span>
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
@@ -518,6 +648,88 @@ export default function AdminOrdersPage() {
                   <span className="text-primary text-base">{activeOrder.total_price.toLocaleString('ar-DZ')} دج</span>
                 </div>
               </div>
+            </div>
+
+            {/* Delivery Company Integration Section */}
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200/70 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Truck className="w-4 h-4 text-purple-700" />
+                  <span className="text-xs font-black text-purple-900">
+                    بيانات الشحن وشركة التوصيل ({activeOrder.delivery_provider === 'zr_express' ? 'ZR Express' : 'Yalidine Express'})
+                  </span>
+                </div>
+                {activeOrder.tracking_number && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-mono font-bold text-xs" dir="ltr">
+                    {activeOrder.tracking_number}
+                  </span>
+                )}
+              </div>
+
+              {activeOrder.tracking_number ? (
+                <div className="space-y-2.5 text-xs">
+                  <div className="bg-white/80 p-3 rounded-xl border border-purple-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[11px] text-on-surface-variant block">الحالة الحية لدى شركة التوصيل:</span>
+                      <span className="font-bold text-on-surface">
+                        {activeOrder.delivery_status_raw || 'في مركز الفرز والتوزيع'}
+                      </span>
+                      {activeOrder.last_delivery_sync && (
+                        <span className="text-[10px] text-outline block mt-0.5">
+                          آخر مزامنة: {new Date(activeOrder.last_delivery_sync).toLocaleTimeString('ar-DZ')}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleSyncOrder(activeOrder)}
+                        disabled={actionLoadingId === activeOrder.id}
+                        className="btn-pill-outline text-xs py-1.5 px-3 flex items-center gap-1 border-blue-300 text-blue-700 hover:bg-blue-50 font-bold"
+                        title="مزامنة الحالة الحية الحالية مع شركة التوصيل"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${actionLoadingId === activeOrder.id ? 'animate-spin' : ''}`} />
+                        <span>مزامنة الحالة</span>
+                      </button>
+
+                      <button
+                        onClick={() => openPrintableShippingLabel(activeOrder)}
+                        className="btn-pill bg-purple-700 hover:bg-purple-800 text-white text-xs py-1.5 px-3 flex items-center gap-1 font-bold shadow-sm"
+                        title="طباعة بوليصة الشحن (Bordereau)"
+                      >
+                        <Printer className="w-3 h-3" />
+                        <span>طباعة البوليصة</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {activeOrder.delivery_tracking_url && (
+                    <a
+                      href={activeOrder.delivery_tracking_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-purple-700 hover:underline text-[11px] font-bold"
+                    >
+                      <span>رابط التتبع الرسمي على موقع {activeOrder.delivery_provider === 'zr_express' ? 'ZR Express' : 'Yalidine Express'}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <p className="text-on-surface-variant">
+                    لم يتم تصدير هذه الطلبية لشركة التوصيل بعد. يمكنك إرسالها الآن بنقرة واحدة لتوليد رقم التتبع وبوليصة الشحن.
+                  </p>
+                  <button
+                    onClick={() => handleDispatchOrder(activeOrder)}
+                    disabled={actionLoadingId === activeOrder.id}
+                    className="btn-pill bg-purple-700 hover:bg-purple-800 text-white text-xs py-2 px-4 font-bold flex items-center justify-center gap-1.5 shrink-0 shadow-sm"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{actionLoadingId === activeOrder.id ? 'جاري الإرسال...' : 'إرسال لشركة التوصيل الآن'}</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Status Change Control */}

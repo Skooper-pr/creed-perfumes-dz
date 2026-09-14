@@ -64,7 +64,30 @@ export interface Order {
   delivery_fee: number;
   status: OrderStatus;
   stock_deducted?: boolean;
+  tracking_number?: string;
+  delivery_provider?: 'yalidine' | 'zr_express' | 'other';
+  delivery_tracking_url?: string;
+  shipping_label_url?: string;
+  delivery_status_raw?: string;
+  last_delivery_sync?: string;
   created_at: string;
+}
+
+export type DeliveryProvider = 'yalidine' | 'zr_express';
+
+export interface DeliverySettings {
+  provider: DeliveryProvider;
+  yalidine_api_id: string;
+  yalidine_api_token: string;
+  zr_api_key: string;
+  zr_api_token: string;
+  sender_name: string;
+  sender_phone: string;
+  sender_address: string;
+  sender_wilaya: string;
+  sender_commune: string;
+  default_delivery_type: 'home' | 'desk';
+  auto_sync_enabled: boolean;
 }
 
 export interface Wilaya {
@@ -74,3 +97,4 @@ export interface Wilaya {
   delivery_fee: number;
   delivery_time: string;
 }
+

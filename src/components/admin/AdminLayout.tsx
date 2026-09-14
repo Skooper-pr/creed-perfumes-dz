@@ -14,7 +14,8 @@ import {
   X,
   Phone,
   ShieldCheck,
-  Bell
+  Bell,
+  Truck
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -46,6 +47,7 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
     { href: '/admin/orders', label: 'طلبيات الولايات', icon: ShoppingBag },
     { href: '/admin/products', label: 'مخزون العطور', icon: Package },
     { href: '/admin/categories', label: 'الفئات والتصنيفات', icon: Layers },
+    { href: '/admin/delivery', label: 'ربط التوصيل (Yalidine/ZR)', icon: Truck },
   ];
 
   return (
