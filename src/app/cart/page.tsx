@@ -7,6 +7,7 @@ import { useCart } from '@/context/CartContext';
 
 export default function CartPage() {
   const { items, updateQuantity, removeItem, clearCart, subtotal, totalItems } = useCart();
+  const hasOutOfStockItem = items.some(item => (item.product.stock ?? 0) <= 0);
 
   if (items.length === 0) {
     return (
@@ -63,24 +64,37 @@ export default function CartPage() {
         <div className="lg:col-span-8 space-y-4">
           {items.map(({ product, quantity }) => {
             const activePrice = product.discount_price ?? product.price;
+            const isItemOutOfStock = (product.stock ?? 0) <= 0;
             return (
               <div
                 key={product.id}
-                className="card-stitch flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 sm:p-5"
+                className={`card-stitch flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 sm:p-5 ${isItemOutOfStock ? 'border-red-300 bg-red-50/20' : ''}`}
               >
                 {/* Thumbnail & Name */}
                 <div className="flex items-center gap-4">
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-surface-container-low p-2 shrink-0 flex items-center justify-center border border-primary/5">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-surface-container-low p-2 shrink-0 flex items-center justify-center border border-primary/5 relative">
                     <img
                       src={product.images[0]}
                       alt={product.name}
-                      className="w-full h-full object-contain"
+                      className={`w-full h-full object-contain ${isItemOutOfStock ? 'grayscale-[50%]' : ''}`}
                     />
+                    {isItemOutOfStock && (
+                      <span className="absolute inset-0 bg-white/70 backdrop-blur-[1px] rounded-2xl flex items-center justify-center text-[10px] font-black text-red-600">
+                        نفذ
+                      </span>
+                    )}
                   </div>
                   <div>
-                    <span className="text-[11px] font-bold text-secondary uppercase">
-                      {product.brand} • {product.concentration || 'Eau De Parfum'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-secondary uppercase">
+                        {product.brand} • {product.concentration || 'Eau De Parfum'}
+                      </span>
+                      {isItemOutOfStock && (
+                        <span className="text-[10px] font-black bg-red-100 text-red-700 px-2 py-0.5 rounded-full border border-red-200">
+                          نفذت الكمية
+                        </span>
+                      )}
+                    </div>
                     <Link href={`/products/${product.slug}`}>
                       <h3 className="font-bold text-base text-on-surface hover:text-primary transition-colors line-clamp-1">
                         {product.name}
@@ -96,6 +110,11 @@ export default function CartPage() {
                         </span>
                       )}
                     </div>
+                    {isItemOutOfStock && (
+                      <p className="text-[11px] font-semibold text-red-600 mt-1">
+                        غير متوفر في المخزون حالياً. يرجى حذفه لإتمام الطلب.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -173,13 +192,28 @@ export default function CartPage() {
             </div>
           </div>
 
-          <Link
-            href="/checkout"
-            className="btn-pill-secondary w-full py-4 text-sm font-extrabold shadow-stitch-coral flex items-center justify-center gap-2"
-          >
-            <span>متابعة إتمام الطلب (الدفع عند الاستلام)</span>
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
+          {hasOutOfStockItem ? (
+            <div className="space-y-2">
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold text-center">
+                يوجد منتج نفذت كميته في سلتك. يرجى حذفه لإكمال الطلب.
+              </div>
+              <button
+                disabled
+                className="w-full py-4 text-sm font-extrabold rounded-full bg-neutral-200 text-neutral-400 cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <span>متابعة إتمام الطلب (غير متاح)</span>
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/checkout"
+              className="btn-pill-secondary w-full py-4 text-sm font-extrabold shadow-stitch-coral flex items-center justify-center gap-2"
+            >
+              <span>متابعة إتمام الطلب (الدفع عند الاستلام)</span>
+              <ArrowLeft className="w-4 h-4" />
+            </Link>
+          )}
 
           <div className="space-y-2 pt-2 border-t border-primary/5 text-[11px] text-on-surface-variant">
             <div className="flex items-center gap-2">

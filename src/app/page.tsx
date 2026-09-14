@@ -93,13 +93,19 @@ export default function HomePage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Link
-                      href={`/products/${featuredProduct?.slug || 'creed-aventus'}`}
-                      className="btn-pill-primary text-sm shadow-stitch-glow"
-                    >
-                      <ShoppingBag className="w-4 h-4" />
-                      <span>اطلب الآن (الدفع عند الاستلام)</span>
-                    </Link>
+                    {(featuredProduct?.stock ?? 0) <= 0 ? (
+                      <span className="px-5 py-3 rounded-full bg-surface-container-high text-red-600 font-black text-sm border border-red-200">
+                        نفذت الكمية (غير متوفر حالياً)
+                      </span>
+                    ) : (
+                      <Link
+                        href={`/products/${featuredProduct?.slug || 'creed-aventus'}`}
+                        className="btn-pill-primary text-sm shadow-stitch-glow"
+                      >
+                        <ShoppingBag className="w-4 h-4" />
+                        <span>اطلب الآن (الدفع عند الاستلام)</span>
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>

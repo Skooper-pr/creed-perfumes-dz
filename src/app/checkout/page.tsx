@@ -51,6 +51,12 @@ export default function CheckoutPage() {
       return;
     }
 
+    const outOfStockItem = items.find(item => (item.product.stock ?? 0) <= 0);
+    if (outOfStockItem) {
+      setErrorMsg(`عذراً، العطر "${outOfStockItem.product.name}" نفذت كميته من المخزون وغير متوفر حالياً. يرجى حذفه من السلة لإكمال الطلب.`);
+      return;
+    }
+
     if (!customerName.trim()) {
       setErrorMsg('يرجى إدخال الاسم واللقب.');
       return;
