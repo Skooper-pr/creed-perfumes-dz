@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Sparkles, ShoppingBag, MessageSquareText } from 'lucide-react';
+import { Home, Sparkles, ShoppingBag, MessageSquareText, Package } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 
 export const MobileBottomNav: React.FC = () => {
@@ -19,6 +19,7 @@ export const MobileBottomNav: React.FC = () => {
     { href: '/', label: 'الرئيسية', icon: Home },
     { href: '/products', label: 'العطور', icon: Sparkles },
     { href: '/cart', label: 'السلة', icon: ShoppingBag, badge: totalItems },
+    { href: '/track', label: 'تتبع طلبي', icon: Package },
     { href: '/contact', label: 'تواصل', icon: MessageSquareText },
   ];
 

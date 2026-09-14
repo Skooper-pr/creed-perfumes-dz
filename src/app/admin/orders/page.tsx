@@ -63,6 +63,7 @@ export default function AdminOrdersPage() {
     shipped: { label: 'قيد الشحن (ياليدين/ZR)', bg: 'bg-blue-100', text: 'text-blue-800' },
     delivered: { label: 'تم التسليم واستلام المبلغ', bg: 'bg-emerald-100', text: 'text-emerald-800' },
     cancelled: { label: 'طلب ملغى', bg: 'bg-neutral-100', text: 'text-neutral-600' },
+    returned: { label: 'طلب راجع / مسترجع', bg: 'bg-rose-100', text: 'text-rose-800' },
   };
 
   const filteredOrders = orders.filter((o) => {
@@ -181,6 +182,17 @@ export default function AdminOrdersPage() {
           }`}
         >
           <span>ملغى ({orders.filter((o) => o.status === 'cancelled').length})</span>
+        </button>
+
+        <button
+          onClick={() => setSelectedStatus('returned')}
+          className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+            selectedStatus === 'returned'
+              ? 'bg-amber-600 text-white shadow-sm'
+              : 'bg-amber-50 text-amber-800'
+          }`}
+        >
+          <span>راجعة ({orders.filter((o) => o.status === 'returned').length})</span>
         </button>
       </div>
 
@@ -473,6 +485,25 @@ export default function AdminOrdersPage() {
                 >
                   ✕ إلغاء الطلبية
                 </button>
+
+                <button
+                  onClick={() => handleStatusChange(activeOrder.id, 'returned')}
+                  className={`p-2.5 rounded-xl text-xs font-bold transition-all border ${
+                    activeOrder.status === 'returned'
+                      ? 'bg-amber-600 text-white border-amber-600'
+                      : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border-transparent'
+                  }`}
+                >
+                  🔄 راجعة / مسترجعة
+                </button>
+              </div>
+
+              {/* Automatic Stock Management Hint */}
+              <div className="p-3 rounded-xl bg-surface-container text-[11px] text-on-surface-variant flex items-start gap-2 border border-primary/5 mt-3">
+                <span className="text-secondary font-bold shrink-0">⚡ نظام المخزون الآلي:</span>
+                <span>
+                  عند نقل الطلبية إلى <strong>(مؤكدة، قيد الشحن، تم التسليم)</strong> يتم خصم كمية المنتجات من المخزون تلقائياً. وإذا تم تحويلها إلى <strong>(معلقة، ملغاة، راجعة)</strong> يتم استرجاع المخزون تلقائياً دون أي تدخل منك.
+                </span>
               </div>
             </div>
 

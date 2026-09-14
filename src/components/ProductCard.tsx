@@ -13,6 +13,7 @@ interface ProductCardProps {
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { addItem, items } = useCart();
+  const isOutOfStock = (product.stock ?? 0) <= 0;
   const activePrice = product.discount_price ?? product.price;
   const hasDiscount = Boolean(product.discount_price && product.discount_price < product.price);
   const discountPercent = hasDiscount
@@ -24,14 +25,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isOutOfStock) return;
     addItem(product, 1);
   };
 
   return (
-    <div className="card-stitch group flex flex-col justify-between relative overflow-hidden h-full">
+    <div className={`card-stitch group flex flex-col justify-between relative overflow-hidden h-full ${isOutOfStock ? 'opacity-90' : ''}`}>
       {/* Top Badges */}
       <div className="flex items-center justify-between gap-2 mb-2 z-10">
-        {hasDiscount ? (
+        {isOutOfStock ? (
+          <span className="bg-red-600 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full shadow-sm">
+            نفذت الكمية
+          </span>
+        ) : hasDiscount ? (
           <span className="bg-secondary text-white text-[11px] font-black px-2.5 py-0.5 rounded-full shadow-sm">
             خصم {discountPercent}%
           </span>
@@ -61,9 +67,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           <img
             src={product.images[0]}
             alt={product.name}
-            className="w-full h-full object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-500 z-10"
+            className={`w-full h-full object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-500 z-10 ${isOutOfStock ? 'grayscale-[40%]' : ''}`}
             loading="lazy"
           />
+
+          {isOutOfStock && (
+            <div className="absolute inset-0 bg-surface/60 backdrop-blur-[1px] rounded-2xl flex items-center justify-center z-20">
+              <span className="bg-red-50 text-red-700 border border-red-200 font-black text-xs px-3 py-1 rounded-full shadow-sm">
+                غير متوفر حالياً
+              </span>
+            </div>
+          )}
         </div>
       </Link>
 
@@ -103,17 +117,26 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             )}
           </div>
 
-          <button
-            onClick={handleAddToCart}
-            aria-label={`أضف ${product.name} إلى السلة`}
-            className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm shrink-0 ${
-              isInCart
-                ? 'bg-secondary text-white hover:bg-secondary-container'
-                : 'bg-primary text-white hover:bg-primary-container hover:shadow-primary/30'
-            }`}
-          >
-            {isInCart ? <Check className="w-5 h-5" /> : <ShoppingBag className="w-5 h-5" />}
-          </button>
+          {isOutOfStock ? (
+            <span
+              className="px-3 h-9 rounded-full flex items-center justify-center bg-surface-container-high text-outline text-[11px] font-bold cursor-not-allowed shrink-0 border border-outline/20"
+              title="نفذت الكمية من المخزون"
+            >
+              نفذت الكمية
+            </span>
+          ) : (
+            <button
+              onClick={handleAddToCart}
+              aria-label={`أضف ${product.name} إلى السلة`}
+              className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm shrink-0 ${
+                isInCart
+                  ? 'bg-secondary text-white hover:bg-secondary-container'
+                  : 'bg-primary text-white hover:bg-primary-container hover:shadow-primary/30'
+              }`}
+            >
+              {isInCart ? <Check className="w-5 h-5" /> : <ShoppingBag className="w-5 h-5" />}
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -38,7 +38,7 @@ export interface CartItem {
   quantity: number;
 }
 
-export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
+export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled' | 'returned';
 
 export interface OrderItem {
   product_id: string;
@@ -63,6 +63,7 @@ export interface Order {
   total_price: number;
   delivery_fee: number;
   status: OrderStatus;
+  stock_deducted?: boolean;
   created_at: string;
 }
 

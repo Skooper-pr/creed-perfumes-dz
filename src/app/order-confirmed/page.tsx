@@ -94,22 +94,30 @@ function OrderConfirmedContent() {
 
       {/* Direct Contact & Home actions */}
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+        <Link
+          href={`/track?query=${encodeURIComponent(orderNumber)}`}
+          className="btn-pill-primary text-xs sm:text-sm py-3.5 px-6 flex items-center justify-center gap-2 w-full sm:w-auto shadow-stitch-coral"
+        >
+          <Truck className="w-4 h-4" />
+          <span>تتبع مسار طلبيتك الآن</span>
+        </Link>
+
         <a
           href="https://wa.me/213550123456"
           target="_blank"
           rel="noopener noreferrer"
-          className="btn-pill-primary text-xs sm:text-sm py-3.5 px-6 flex items-center gap-2 w-full sm:w-auto"
+          className="btn-pill-outline text-xs sm:text-sm py-3.5 px-6 flex items-center justify-center gap-2 w-full sm:w-auto"
         >
-          <MessageSquare className="w-4 h-4" />
-          <span>تواصل معنا عبر واتساب للمتابعة</span>
+          <MessageSquare className="w-4 h-4 text-green-600" />
+          <span>تواصل معنا عبر واتساب</span>
         </a>
 
         <Link
           href="/"
-          className="btn-pill-outline text-xs sm:text-sm py-3.5 px-6 flex items-center gap-2 w-full sm:w-auto"
+          className="text-xs text-on-surface-variant hover:text-primary py-2 px-4 flex items-center justify-center gap-1 font-bold"
         >
           <span>العودة للمتجر الرئيسي</span>
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-3.5 h-3.5" />
         </Link>
       </div>
 

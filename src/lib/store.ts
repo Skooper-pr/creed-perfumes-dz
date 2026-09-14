@@ -262,6 +262,36 @@ export async function deleteCategory(id: string): Promise<boolean> {
   return true;
 }
 
+// -------------------- STOCK MANAGEMENT --------------------
+export async function adjustProductStock(productIdOrSlug: string, delta: number): Promise<void> {
+  const products = await getProducts();
+  const product = products.find(p => p.id === productIdOrSlug || p.slug === productIdOrSlug);
+  if (!product) return;
+
+  const currentStock = Number(product.stock ?? 0);
+  const newStock = Math.max(0, currentStock + delta);
+  product.stock = newStock;
+
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ stock: newStock })
+        .eq('id', product.id);
+      if (error) console.error('Supabase stock update error:', error);
+    } catch (e) {
+      console.warn('Supabase stock update error:', e);
+    }
+  }
+
+  const localProducts = getLocal<Product[]>(PRODUCTS_KEY, INITIAL_PRODUCTS);
+  const idx = localProducts.findIndex(p => p.id === product.id);
+  if (idx >= 0) {
+    localProducts[idx].stock = newStock;
+    setLocal(PRODUCTS_KEY, localProducts);
+  }
+}
+
 // -------------------- ORDERS --------------------
 export async function getOrders(): Promise<Order[]> {
   if (isSupabaseConfigured() && supabase) {
@@ -289,6 +319,7 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'order_number' |
     id: `ord-${Date.now()}`,
     order_number: orderNumber,
     status: 'pending',
+    stock_deducted: false,
     created_at: new Date().toISOString(),
   };
 
@@ -315,21 +346,88 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'order_number' |
 }
 
 export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<boolean> {
+  const orders = await getOrders();
+  const order = orders.find(o => o.id === orderId || o.order_number === orderId);
+  if (!order) return false;
+
+  const wasDeducted = Boolean(order.stock_deducted);
+  const shouldDeduct = ['confirmed', 'shipped', 'delivered'].includes(status);
+  const shouldRestore = ['pending', 'cancelled', 'returned'].includes(status);
+
+  let newStockDeducted = wasDeducted;
+
+  // Rule 1: Moving to confirmed/shipped/delivered and not yet deducted -> deduct quantities
+  if (shouldDeduct && !wasDeducted) {
+    if (order.items && order.items.length > 0) {
+      for (const item of order.items) {
+        await adjustProductStock(item.product_id, -Number(item.qty || 1));
+      }
+    }
+    newStockDeducted = true;
+  }
+  // Rule 2: Moving to pending/cancelled/returned and was deducted -> restore quantities
+  else if (shouldRestore && wasDeducted) {
+    if (order.items && order.items.length > 0) {
+      for (const item of order.items) {
+        await adjustProductStock(item.product_id, Number(item.qty || 1));
+      }
+    }
+    newStockDeducted = false;
+  }
+
+  // Update in Supabase
   if (isSupabaseConfigured() && supabase) {
     try {
-      const { error } = await supabase.from('orders').update({ status }).eq('id', orderId);
+      const { error } = await supabase
+        .from('orders')
+        .update({ status, stock_deducted: newStockDeducted })
+        .eq('id', order.id);
       if (error) console.error('Supabase order update error:', error);
     } catch (e) {
       console.warn('Falling back to local update:', e);
     }
   }
 
-  const orders = getLocal<Order[]>(ORDERS_KEY, INITIAL_ORDERS);
-  const target = orders.find(o => o.id === orderId || o.order_number === orderId);
+  // Update in local cache
+  const localOrders = getLocal<Order[]>(ORDERS_KEY, INITIAL_ORDERS);
+  const target = localOrders.find(o => o.id === order.id || o.order_number === order.order_number);
   if (target) {
     target.status = status;
-    setLocal(ORDERS_KEY, orders);
+    target.stock_deducted = newStockDeducted;
+    setLocal(ORDERS_KEY, localOrders);
   }
+
   notifyDataChanged();
   return true;
+}
+
+export async function getOrdersByPhone(query: string): Promise<Order[]> {
+  const clean = query.trim().replace(/[\s\-\+\(\)]/g, '');
+  if (!clean) return [];
+
+  const stripped213 = clean.startsWith('213') ? '0' + clean.slice(3) : clean;
+  const strippedZero = clean.startsWith('0') ? clean.slice(1) : clean;
+
+  const allOrders = await getOrders();
+  return allOrders.filter(order => {
+    const orderPhoneClean = (order.phone || '').replace(/[\s\-\+\(\)]/g, '');
+    const secondaryPhoneClean = (order.phone_secondary || '').replace(/[\s\-\+\(\)]/g, '');
+    const orderNum = (order.order_number || '').toLowerCase().replace(/[\s\-]/g, '');
+    const qLower = clean.toLowerCase();
+
+    const matchOrderNum = orderNum.includes(qLower) || (order.order_number || '').toLowerCase().includes(qLower);
+    const matchPhone =
+      orderPhoneClean.includes(clean) ||
+      orderPhoneClean.includes(stripped213) ||
+      orderPhoneClean.includes(strippedZero) ||
+      clean.includes(orderPhoneClean);
+
+    const matchSecondary = secondaryPhoneClean && (
+      secondaryPhoneClean.includes(clean) ||
+      secondaryPhoneClean.includes(stripped213) ||
+      secondaryPhoneClean.includes(strippedZero)
+    );
+
+    return matchOrderNum || matchPhone || matchSecondary;
+  });
 }

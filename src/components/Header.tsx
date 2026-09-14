@@ -27,6 +27,7 @@ export const Header: React.FC = () => {
   const navLinks = [
     { href: '/', label: 'الرئيسية' },
     { href: '/products', label: 'جميع العطور' },
+    { href: '/track', label: 'تتبع طلبيتك' },
     { href: '/faq', label: 'التوصيل والضمان' },
     { href: '/contact', label: 'اتصل بنا' },
   ];

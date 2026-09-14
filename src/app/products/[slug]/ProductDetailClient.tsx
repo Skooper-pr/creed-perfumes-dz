@@ -14,7 +14,8 @@ import {
   Check, 
   Plus, 
   Minus,
-  Layers
+  Layers,
+  Ban
 } from 'lucide-react';
 import { getProductBySlug, getProducts, subscribeToStoreChanges } from '@/lib/store';
 import { Product } from '@/types';
@@ -77,6 +78,7 @@ export default function ProductDetailClient() {
     );
   }
 
+  const isOutOfStock = (product.stock ?? 0) <= 0;
   const activePrice = product.discount_price ?? product.price;
   const hasDiscount = Boolean(product.discount_price && product.discount_price < product.price);
   const discountPercent = hasDiscount
@@ -84,10 +86,12 @@ export default function ProductDetailClient() {
     : 0;
 
   const handleAddToCart = () => {
+    if (isOutOfStock) return;
     addItem(product, quantity);
   };
 
   const handleDirectBuy = () => {
+    if (isOutOfStock) return;
     addItem(product, quantity);
     router.push('/checkout');
   };
@@ -114,12 +118,17 @@ export default function ProductDetailClient() {
             <div className="absolute -bottom-10 -right-10 w-48 h-48 rounded-full bg-secondary/15 blur-2xl pointer-events-none" />
 
             <div className="absolute top-4 right-4 z-10 flex flex-col gap-1.5">
-              {hasDiscount && (
+              {isOutOfStock ? (
+                <span className="bg-red-600 text-white text-xs font-black px-3.5 py-1.5 rounded-full shadow-sm flex items-center gap-1">
+                  <Ban className="w-3.5 h-3.5" />
+                  <span>نفذت الكمية</span>
+                </span>
+              ) : hasDiscount ? (
                 <span className="bg-secondary text-white text-xs font-black px-3 py-1 rounded-full shadow-sm">
                   وفر {discountPercent}%
                 </span>
-              )}
-              {product.is_featured && (
+              ) : null}
+              {product.is_featured && !isOutOfStock && (
                 <span className="bg-primary text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
                   <Sparkles className="w-3.5 h-3.5 text-secondary" />
                   <span>عطر مميز</span>
@@ -193,11 +202,23 @@ export default function ProductDetailClient() {
             </div>
 
             <div className="text-left">
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">
-                <Check className="w-3.5 h-3.5" />
-                <span>متوفر في المخزون</span>
-              </span>
-              <p className="text-[11px] text-on-surface-variant mt-1">الدفع عند الاستلام (COD)</p>
+              {isOutOfStock ? (
+                <div>
+                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-red-100 text-red-700 text-xs font-black border border-red-200 shadow-sm">
+                    <Ban className="w-3.5 h-3.5" />
+                    <span>نفذت الكمية (غير متوفر)</span>
+                  </span>
+                  <p className="text-[11px] text-red-600 font-semibold mt-1">الطلب غير متاح حالياً</p>
+                </div>
+              ) : (
+                <div>
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>متوفر في المخزون</span>
+                  </span>
+                  <p className="text-[11px] text-on-surface-variant mt-1">الدفع عند الاستلام (COD)</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -253,50 +274,70 @@ export default function ProductDetailClient() {
             </div>
           </div>
 
-          <div className="space-y-4 pt-2">
-            <div className="flex items-center gap-4">
-              <span className="text-xs font-bold text-on-surface">الكمية:</span>
-              <div className="flex items-center bg-surface-container rounded-full p-1 border border-primary/10">
-                <button
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-on-surface hover:text-primary transition-colors shadow-sm"
-                  aria-label="إنقاص الكمية"
-                >
-                  <Minus className="w-3.5 h-3.5" />
-                </button>
-                <span className="w-10 text-center text-sm font-black text-on-surface">
-                  {quantity}
+          {/* Purchase Actions or Out of Stock Alert */}
+          {isOutOfStock ? (
+            <div className="p-5 rounded-3xl bg-red-50/80 border border-red-200 text-center space-y-3">
+              <div className="flex items-center justify-center gap-2 text-red-700 font-black text-base">
+                <Ban className="w-5 h-5" />
+                <span>عذراً، هذا العطر غير متوفر حالياً في المخزون (نفذت الكمية)</span>
+              </div>
+              <p className="text-xs text-red-600 leading-relaxed max-w-md mx-auto">
+                تم نفاد كامل الكمية المتوفرة من هذا العطر الملكي. يمكنك تصفح باقي العطور الأيقونية المتوفرة للطلب الفوري.
+              </p>
+              <Link
+                href="/products"
+                className="btn-pill-primary text-xs py-3 px-8 inline-flex items-center gap-2 shadow-stitch-glow"
+              >
+                <span>تصفح تشكيلة العطور المتوفرة</span>
+                <ArrowLeft className="w-4 h-4" />
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-bold text-on-surface">الكمية:</span>
+                <div className="flex items-center bg-surface-container rounded-full p-1 border border-primary/10">
+                  <button
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-on-surface hover:text-primary transition-colors shadow-sm"
+                    aria-label="إنقاص الكمية"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="w-10 text-center text-sm font-black text-on-surface">
+                    {quantity}
+                  </span>
+                  <button
+                    onClick={() => setQuantity(quantity + 1)}
+                    className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-on-surface hover:text-primary transition-colors shadow-sm"
+                    aria-label="زيادة الكمية"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <span className="text-xs text-on-surface-variant">
+                  الإجمالي: {(activePrice * quantity).toLocaleString('ar-DZ')} دج
                 </span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <button
-                  onClick={() => setQuantity(quantity + 1)}
-                  className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-on-surface hover:text-primary transition-colors shadow-sm"
-                  aria-label="زيادة الكمية"
+                  onClick={handleDirectBuy}
+                  className="btn-pill-secondary flex-1 text-sm py-4 shadow-stitch-coral"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>اطلب الآن مباشرة (الدفع عند الاستلام)</span>
+                </button>
+
+                <button
+                  onClick={handleAddToCart}
+                  className="btn-pill-primary flex-1 text-sm py-4 shadow-stitch-glow"
+                >
+                  <span>أضف إلى سلة المشتريات</span>
                 </button>
               </div>
-              <span className="text-xs text-on-surface-variant">
-                الإجمالي: {(activePrice * quantity).toLocaleString('ar-DZ')} دج
-              </span>
             </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <button
-                onClick={handleDirectBuy}
-                className="btn-pill-secondary flex-1 text-sm py-4 shadow-stitch-coral"
-              >
-                <ShoppingBag className="w-4 h-4" />
-                <span>اطلب الآن مباشرة (الدفع عند الاستلام)</span>
-              </button>
-
-              <button
-                onClick={handleAddToCart}
-                className="btn-pill-primary flex-1 text-sm py-4 shadow-stitch-glow"
-              >
-                <span>أضف إلى سلة المشتريات</span>
-              </button>
-            </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3 pt-4 border-t border-primary/10 text-xs">
             <div className="flex items-center gap-2 text-on-surface-variant">
