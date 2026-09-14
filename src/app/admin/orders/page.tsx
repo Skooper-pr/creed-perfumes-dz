@@ -16,9 +16,12 @@ import {
   Eye,
   X,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  FileSpreadsheet,
+  Download
 } from 'lucide-react';
 import { getOrders, updateOrderStatus, subscribeToStoreChanges } from '@/lib/store';
+import { exportOrdersToExcel } from '@/lib/exportOrders';
 import { Order, OrderStatus } from '@/types';
 import { ALGERIA_WILAYAS } from '@/data/wilayas';
 
@@ -105,11 +108,34 @@ export default function AdminOrdersPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-2xl border border-primary/5">
-          <span className="text-xs font-bold text-on-surface-variant">الطلبات غير المؤكدة:</span>
-          <span className="text-sm font-black text-secondary">
-            {orders.filter(o => o.status === 'pending').length}
-          </span>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-2 bg-surface-container-low px-3.5 py-2 rounded-2xl border border-primary/5">
+            <span className="text-xs font-bold text-on-surface-variant">غير المؤكدة:</span>
+            <span className="text-sm font-black text-secondary">
+              {orders.filter(o => o.status === 'pending').length}
+            </span>
+          </div>
+
+          {/* Export to Excel Primary Button */}
+          <button
+            onClick={() => exportOrdersToExcel(filteredOrders, selectedStatus !== 'all' ? selectedStatus : 'filtered')}
+            className="btn-pill bg-emerald-700 hover:bg-emerald-800 text-white text-xs py-2.5 px-4 font-bold flex items-center gap-2 shadow-sm transition-all"
+            title="تصدير الطلبيات المعروضة في الجدول حالياً إلى ملف Excel مع كامل معلومات الزبائن والعنوان"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
+            <span>تصدير Excel ({filteredOrders.length})</span>
+          </button>
+
+          {filteredOrders.length !== orders.length && (
+            <button
+              onClick={() => exportOrdersToExcel(orders, 'All_Orders')}
+              className="btn-pill-outline text-xs py-2.5 px-3 font-bold flex items-center gap-1.5 border-emerald-600/30 text-emerald-800 hover:bg-emerald-50"
+              title="تصدير جميع طلبيات المتجر بدون أي تصفية"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>الكل ({orders.length})</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -345,12 +371,22 @@ export default function AdminOrdersPage() {
                 </span>
               </div>
 
-              <button
-                onClick={() => setActiveOrder(null)}
-                className="w-8 h-8 rounded-full bg-surface-container text-outline hover:text-on-surface flex items-center justify-center"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => exportOrdersToExcel([activeOrder], activeOrder.order_number)}
+                  className="btn-pill-outline text-xs py-1.5 px-3 flex items-center gap-1.5 border-emerald-600/30 text-emerald-700 hover:bg-emerald-50 font-bold"
+                  title="تصدير بيانات هذه الطلبية إلى ملف Excel"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>تصدير Excel</span>
+                </button>
+                <button
+                  onClick={() => setActiveOrder(null)}
+                  className="w-8 h-8 rounded-full bg-surface-container text-outline hover:text-on-surface flex items-center justify-center"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Customer Details */}
