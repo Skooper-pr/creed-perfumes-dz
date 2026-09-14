@@ -294,28 +294,5 @@ export const INITIAL_ORDERS: Order[] = [
     delivery_fee: 600,
     status: 'shipped',
     created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-  },
-  {
-    id: 'ord-84915',
-    order_number: 'DZ-84915',
-    customer_name: 'فاروق مزيان',
-    phone: '0555667788',
-    wilaya: '25 - قسنطينة',
-    wilaya_code: '25',
-    commune: 'علي منجلي - الوحدة جوارية 05',
-    address: 'إقامة النرجس، عمارة 12',
-    items: [
-      {
-        product_id: 'prod-green-irish-tweed',
-        name: 'Creed Green Irish Tweed (100ml)',
-        price: 28900,
-        qty: 1,
-        image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBu3v-WtZ3oLnZwnhvgueiZQ0ImNUP5Ysa2WdjEHZAabIuQ9NRcI4JHo7Qlhv0-q3Yf5KUZzyd4wjdtBAgN7Kywjmx0aBpQJOuir0lJIsu_dpz3YUMuM2a08r6bMMjJ1jc6UBqxm_J-rFHReZ3L6k7_9jJZPJDQCH77HlR0lYdG0dp4x4RH4iIvllJW0Vu3Y0CIXO5Vqsqbz9rYoCWCGEFMjkVicG73goUUg9SKA-J1XbdBkzezPSWm'
-      }
-    ],
-    total_price: 29500,
-    delivery_fee: 600,
-    status: 'delivered',
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
   }
 ];

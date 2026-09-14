@@ -18,9 +18,10 @@ import {
   Calendar,
   AlertCircle,
   FileSpreadsheet,
-  Download
+  Download,
+  Trash2
 } from 'lucide-react';
-import { getOrders, updateOrderStatus, subscribeToStoreChanges } from '@/lib/store';
+import { getOrders, updateOrderStatus, deleteOrder, subscribeToStoreChanges } from '@/lib/store';
 import { exportOrdersToExcel } from '@/lib/exportOrders';
 import { Order, OrderStatus } from '@/types';
 import { ALGERIA_WILAYAS } from '@/data/wilayas';
@@ -32,6 +33,7 @@ export default function AdminOrdersPage() {
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedWilaya, setSelectedWilaya] = useState<string>('all');
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
 
   const loadOrders = async () => {
     try {
@@ -51,12 +53,44 @@ export default function AdminOrdersPage() {
   }, []);
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+    if (newStatus === 'delivered') {
+      if (confirm('هل تم تسليم الطلبية واستلام المبلغ من الزبون؟ سيتم خصم المخزون وحذف الطلبية فوراً من الموقع.')) {
+        await updateOrderStatus(orderId, 'delivered');
+        setActiveOrder(null);
+        setStatusNotice('تم تسليم الطلبية واستلام المبلغ، وتم خصم المخزون وحذفها بنجاح من الموقع.');
+        setTimeout(() => setStatusNotice(null), 5000);
+        await loadOrders();
+      }
+      return;
+    }
+
+    if (newStatus === 'cancelled') {
+      if (confirm('هل تريد إلغاء هذه الطلبية؟ سيتم استرجاع المخزون وحذف الطلبية فوراً من الموقع.')) {
+        await updateOrderStatus(orderId, 'cancelled');
+        setActiveOrder(null);
+        setStatusNotice('تم إلغاء الطلبية واسترجاع كمية المخزون وحذفها فوراً من الموقع.');
+        setTimeout(() => setStatusNotice(null), 5000);
+        await loadOrders();
+      }
+      return;
+    }
+
     await updateOrderStatus(orderId, newStatus);
     setOrders((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
     );
     if (activeOrder && activeOrder.id === orderId) {
       setActiveOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string, orderNumber: string) => {
+    if (confirm(`هل أنت متأكد من حذف الطلبية ${orderNumber} نهائياً؟ سيتم حذفها فوراً من قاعدة البيانات والمتجر.`)) {
+      await deleteOrder(orderId);
+      setActiveOrder(null);
+      setStatusNotice(`تم حذف الطلبية ${orderNumber} نهائياً.`);
+      setTimeout(() => setStatusNotice(null), 4000);
+      await loadOrders();
     }
   };
 
@@ -136,6 +170,29 @@ export default function AdminOrdersPage() {
               <span>الكل ({orders.length})</span>
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Status Notice if an order was updated or deleted */}
+      {statusNotice && (
+        <div className="p-4 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold animate-in fade-in flex items-center gap-2 shadow-sm">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+          <span>{statusNotice}</span>
+        </div>
+      )}
+
+      {/* Auto-Purge Policy Alert Banner */}
+      <div className="bg-surface-container-low border border-primary/10 rounded-2xl p-4 flex items-start gap-3 text-xs">
+        <AlertCircle className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <p className="font-bold text-on-surface">
+            نظام الحذف والإلغاء التلقائي نشط في المتجر:
+          </p>
+          <p className="text-on-surface-variant leading-relaxed">
+            • الطلبيات التي يتم تسليمها (<strong className="text-emerald-700">تم التسليم</strong>) يُخصم مخزونها وتُحذف فوراً من الموقع.<br />
+            • الطلبيات الملغاة (<strong className="text-neutral-700">ملغى</strong>) يُسترجع مخزونها وتُحذف فوراً من الموقع.<br />
+            • أي طلبية معلقة (<strong className="text-secondary">بانتظار التأكيد</strong>) مرّ عليها أكثر من 48 ساعة دون معالجة تُحذف تلقائياً من الموقع دون بقاء أي أثر.
+          </p>
         </div>
       </div>
 
@@ -491,13 +548,10 @@ export default function AdminOrdersPage() {
 
                 <button
                   onClick={() => handleStatusChange(activeOrder.id, 'delivered')}
-                  className={`p-2.5 rounded-xl text-xs font-bold transition-all border ${
-                    activeOrder.status === 'delivered'
-                      ? 'bg-emerald-600 text-white border-emerald-600'
-                      : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border-transparent'
-                  }`}
+                  className="p-2.5 rounded-xl text-xs font-bold transition-all border bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border-emerald-300 flex flex-col items-center justify-center gap-0.5"
                 >
-                  💰 تم التسليم والدفع
+                  <span className="font-black">💰 تم التسليم والدفع</span>
+                  <span className="text-[10px] text-emerald-600 font-normal">(يخصم ويُحذف فوراً)</span>
                 </button>
 
                 <button
@@ -508,18 +562,15 @@ export default function AdminOrdersPage() {
                       : 'bg-secondary/10 text-secondary hover:bg-secondary/20 border-transparent'
                   }`}
                 >
-                  ⏳ معلقة (Pending)
+                  ⏳ معلقة (أقل من 48h)
                 </button>
 
                 <button
                   onClick={() => handleStatusChange(activeOrder.id, 'cancelled')}
-                  className={`p-2.5 rounded-xl text-xs font-bold transition-all border ${
-                    activeOrder.status === 'cancelled'
-                      ? 'bg-neutral-800 text-white border-neutral-800'
-                      : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 border-transparent'
-                  }`}
+                  className="p-2.5 rounded-xl text-xs font-bold transition-all border bg-neutral-100 text-neutral-700 hover:bg-neutral-200 border-neutral-300 flex flex-col items-center justify-center gap-0.5"
                 >
-                  ✕ إلغاء الطلبية
+                  <span className="font-black">✕ إلغاء الطلبية</span>
+                  <span className="text-[10px] text-neutral-500 font-normal">(يسترجع ويُحذف فوراً)</span>
                 </button>
 
                 <button
@@ -534,11 +585,22 @@ export default function AdminOrdersPage() {
                 </button>
               </div>
 
-              {/* Automatic Stock Management Hint */}
+              {/* Direct Delete Button */}
+              <div className="pt-2">
+                <button
+                  onClick={() => handleDeleteOrder(activeOrder.id, activeOrder.order_number)}
+                  className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <Trash2 className="w-4 h-4 text-red-600" />
+                  <span>حذف هذه الطلبية نهائياً من الموقع</span>
+                </button>
+              </div>
+
+              {/* Automatic Stock & Auto-Purge Hint */}
               <div className="p-3 rounded-xl bg-surface-container text-[11px] text-on-surface-variant flex items-start gap-2 border border-primary/5 mt-3">
-                <span className="text-secondary font-bold shrink-0">⚡ نظام المخزون الآلي:</span>
+                <span className="text-secondary font-bold shrink-0">⚡ نظام الحذف والمخزون الآلي:</span>
                 <span>
-                  عند نقل الطلبية إلى <strong>(مؤكدة، قيد الشحن، تم التسليم)</strong> يتم خصم كمية المنتجات من المخزون تلقائياً. وإذا تم تحويلها إلى <strong>(معلقة، ملغاة، راجعة)</strong> يتم استرجاع المخزون تلقائياً دون أي تدخل منك.
+                  الطلبيات <strong>المسلمة</strong> أو <strong>الملغاة</strong> أو التي مر عليها <strong>أكثر من 48 ساعة دون تأكيد</strong> تُحذف تلقائياً من الموقع دون بقاء أي أثر، مع استرجاع المخزون في حالة الإلغاء وخصمه في حالة التسليم.
                 </span>
               </div>
             </div>

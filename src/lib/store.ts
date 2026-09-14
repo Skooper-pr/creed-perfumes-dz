@@ -293,22 +293,99 @@ export async function adjustProductStock(productIdOrSlug: string, delta: number)
 }
 
 // -------------------- ORDERS --------------------
+const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * Automatically purge delivered, cancelled, and stale pending orders (> 48h without progress)
+ * Ensures they are completely removed from Supabase and local store.
+ */
+export async function purgeStaleAndCompletedOrders(rawOrders: Order[]): Promise<Order[]> {
+  const now = Date.now();
+  const toPurge: Order[] = [];
+  const keepOrders: Order[] = [];
+
+  for (const order of rawOrders) {
+    let shouldPurge = false;
+
+    // Rule 1: Delivered orders -> purge immediately
+    if (order.status === 'delivered') {
+      shouldPurge = true;
+    }
+    // Rule 2: Cancelled orders -> purge immediately
+    else if (order.status === 'cancelled') {
+      shouldPurge = true;
+    }
+    // Rule 3: Pending orders with no progress for > 48 hours -> purge immediately
+    else if (order.status === 'pending') {
+      const orderDate = new Date(order.created_at).getTime();
+      if (!isNaN(orderDate) && (now - orderDate) > FORTY_EIGHT_HOURS_MS) {
+        shouldPurge = true;
+      }
+    }
+
+    if (shouldPurge) {
+      toPurge.push(order);
+    } else {
+      keepOrders.push(order);
+    }
+  }
+
+  if (toPurge.length > 0) {
+    // Restore stock if any cancelled/stale order had stock deducted
+    for (const order of toPurge) {
+      if (order.stock_deducted && order.status !== 'delivered') {
+        if (order.items && order.items.length > 0) {
+          for (const item of order.items) {
+            await adjustProductStock(item.product_id, Number(item.qty || 1));
+          }
+        }
+      }
+    }
+
+    // Delete purged orders from Supabase
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        const ids = toPurge.map(p => p.id);
+        const { error } = await supabase.from('orders').delete().in('id', ids);
+        if (error) console.error('Supabase orders purge error:', error);
+      } catch (e) {
+        console.warn('Error purging orders from Supabase:', e);
+      }
+    }
+
+    // Update local cache with kept orders only
+    setLocal(ORDERS_KEY, keepOrders);
+    notifyDataChanged();
+  }
+
+  return keepOrders;
+}
+
 export async function getOrders(): Promise<Order[]> {
+  let fetchedOrders: Order[] = [];
+
   if (isSupabaseConfigured() && supabase) {
     try {
       const { data, error } = await supabase
         .from('orders')
         .select('*')
         .order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) {
-        setLocal(ORDERS_KEY, data);
-        return data as Order[];
+
+      if (!error && data) {
+        fetchedOrders = data as Order[];
       }
     } catch (e) {
       console.warn('Falling back to local orders:', e);
     }
   }
-  return getLocal<Order[]>(ORDERS_KEY, INITIAL_ORDERS);
+
+  if (fetchedOrders.length === 0) {
+    fetchedOrders = getLocal<Order[]>(ORDERS_KEY, INITIAL_ORDERS);
+  }
+
+  // Automatically purge delivered, cancelled, or >48h stale pending orders
+  const activeOrders = await purgeStaleAndCompletedOrders(fetchedOrders);
+  return activeOrders;
 }
 
 export async function createOrder(orderData: Omit<Order, 'id' | 'order_number' | 'created_at' | 'status'>): Promise<Order> {
@@ -345,18 +422,73 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'order_number' |
   return newOrder;
 }
 
+export async function deleteOrder(orderId: string): Promise<boolean> {
+  const orders = await getOrders();
+  const order = orders.find(o => o.id === orderId || o.order_number === orderId);
+  if (!order) return false;
+
+  // If stock was deducted and order was not delivered, restore stock
+  if (order.stock_deducted && order.status !== 'delivered') {
+    if (order.items && order.items.length > 0) {
+      for (const item of order.items) {
+        await adjustProductStock(item.product_id, Number(item.qty || 1));
+      }
+    }
+  }
+
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      const { error } = await supabase.from('orders').delete().eq('id', order.id);
+      if (error) console.error('Supabase deleteOrder error:', error);
+    } catch (e) {
+      console.warn('Error deleting order from Supabase:', e);
+    }
+  }
+
+  const localOrders = getLocal<Order[]>(ORDERS_KEY, INITIAL_ORDERS);
+  const filtered = localOrders.filter(o => o.id !== order.id && o.order_number !== order.order_number);
+  setLocal(ORDERS_KEY, filtered);
+  notifyDataChanged();
+  return true;
+}
+
 export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<boolean> {
   const orders = await getOrders();
   const order = orders.find(o => o.id === orderId || o.order_number === orderId);
   if (!order) return false;
 
   const wasDeducted = Boolean(order.stock_deducted);
-  const shouldDeduct = ['confirmed', 'shipped', 'delivered'].includes(status);
-  const shouldRestore = ['pending', 'cancelled', 'returned'].includes(status);
+
+  // Case A: Order is delivered -> ensure stock is deducted, then delete immediately from the site
+  if (status === 'delivered') {
+    if (!wasDeducted && order.items && order.items.length > 0) {
+      for (const item of order.items) {
+        await adjustProductStock(item.product_id, -Number(item.qty || 1));
+      }
+    }
+    // Delete immediately from site as per requirements
+    await deleteOrder(order.id);
+    return true;
+  }
+
+  // Case B: Order is cancelled -> restore stock if deducted, then delete immediately from the site
+  if (status === 'cancelled') {
+    if (wasDeducted && order.items && order.items.length > 0) {
+      for (const item of order.items) {
+        await adjustProductStock(item.product_id, Number(item.qty || 1));
+      }
+    }
+    // Delete immediately from site as per requirements
+    await deleteOrder(order.id);
+    return true;
+  }
+
+  // Case C: Active statuses ('confirmed', 'shipped', 'pending', 'returned')
+  const shouldDeduct = ['confirmed', 'shipped'].includes(status);
+  const shouldRestore = ['pending', 'returned'].includes(status);
 
   let newStockDeducted = wasDeducted;
 
-  // Rule 1: Moving to confirmed/shipped/delivered and not yet deducted -> deduct quantities
   if (shouldDeduct && !wasDeducted) {
     if (order.items && order.items.length > 0) {
       for (const item of order.items) {
@@ -364,9 +496,7 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus): P
       }
     }
     newStockDeducted = true;
-  }
-  // Rule 2: Moving to pending/cancelled/returned and was deducted -> restore quantities
-  else if (shouldRestore && wasDeducted) {
+  } else if (shouldRestore && wasDeducted) {
     if (order.items && order.items.length > 0) {
       for (const item of order.items) {
         await adjustProductStock(item.product_id, Number(item.qty || 1));
