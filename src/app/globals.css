@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --primary: #541f91;
+    --primary-container: #6c3baa;
+    --secondary: #f47a60;
+    --secondary-container: #fe8267;
+    --surface: #fff7ff;
+    --surface-container-low: #faf0ff;
+    --surface-container: #f6e9ff;
+    --surface-container-high: #f1e3fc;
+    --surface-container-lowest: #ffffff;
+    --on-surface: #20182a;
+    --on-surface-variant: #4b4452;
+  }
+
+  html {
+    direction: rtl;
+    text-align: right;
+    scroll-behavior: smooth;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  body {
+    background-color: var(--surface);
+    color: var(--on-surface);
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Optimize touch target sizes for mobile */
+  button, a, input, select, textarea {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+}
+
+@layer components {
+  /* Pill shaped buttons from Google Stitch design */
+  .btn-pill {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-bold transition-all duration-300 active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-pill-primary {
+    @apply btn-pill bg-primary text-white hover:bg-primary-container shadow-stitch-glow hover:shadow-primary/40;
+  }
+
+  .btn-pill-secondary {
+    @apply btn-pill bg-secondary text-white hover:bg-secondary-container shadow-stitch-coral hover:shadow-secondary/40;
+  }
+
+  .btn-pill-outline {
+    @apply btn-pill bg-transparent border-2 border-primary/25 text-primary hover:bg-primary/5;
+  }
+
+  .btn-pill-soft {
+    @apply btn-pill bg-surface-container text-primary hover:bg-primary hover:text-white;
+  }
+
+  /* Stitch luxury card styles */
+  .card-stitch {
+    @apply bg-surface-container-lowest rounded-2xl p-5 md:p-6 shadow-stitch border border-primary/5 transition-all duration-300 hover:shadow-stitch-hover;
+  }
+
+  /* Glass header */
+  .header-glass {
+    @apply bg-surface/85 backdrop-blur-xl border-b border-primary/10 shadow-[0_1px_12px_rgba(108,59,170,0.06)];
+  }
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #faf0ff;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #dcbfff;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6c3baa;
+}
