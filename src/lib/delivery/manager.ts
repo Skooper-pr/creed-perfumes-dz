@@ -4,12 +4,200 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 const DELIVERY_SETTINGS_KEY = 'creed_delivery_settings';
 
+export interface DeliveryCompanyDetails {
+  id: DeliveryProvider;
+  name: string;
+  name_ar: string;
+  shortName: string;
+  tagline: string;
+  themeColor: string;
+  badgeBg: string;
+  badgeText: string;
+  prefix: string;
+  website: string;
+  coverage: string;
+  apiKeyField: keyof DeliverySettings;
+  description: string;
+  trackingUrl: (t: string) => string;
+}
+
+export const DELIVERY_COMPANIES: Record<DeliveryProvider, DeliveryCompanyDetails> = {
+  yalidine: {
+    id: 'yalidine',
+    name: 'Yalidine Express',
+    name_ar: 'ياليدين إكسبريس',
+    shortName: 'Yalidine',
+    tagline: 'الرائد الأول في الشحن السريع والتجارة الإلكترونية في الجزائر',
+    themeColor: '#ea580c',
+    badgeBg: 'bg-orange-50',
+    badgeText: 'text-orange-800',
+    prefix: 'yal-',
+    website: 'https://yalidine.app',
+    coverage: 'الـ 58 ولاية (مكاتب + توصيل للمنزل)',
+    apiKeyField: 'yalidine_api_token',
+    description: 'تغطية شاملة مع أكبر شبكة مراكز فرز ومكاتب إيداع وسحب COD في الجزائر.',
+    trackingUrl: (t) => `https://yalidine.app/app/tracking/?tracking=${t}`,
+  },
+  zr_express: {
+    id: 'zr_express',
+    name: 'ZR Express',
+    name_ar: 'زد آر إكسبريس',
+    shortName: 'ZR Express',
+    tagline: 'توصيل موثوق وسريع لـ 58 ولاية مع دفع سريع للـ COD',
+    themeColor: '#2563eb',
+    badgeBg: 'bg-blue-50',
+    badgeText: 'text-blue-800',
+    prefix: 'ZR-',
+    website: 'https://zrexpress.dz',
+    coverage: 'الـ 58 ولاية جزائرية',
+    apiKeyField: 'zr_api_key',
+    description: 'واحدة من أشهر شركات التوصيل مع منصة متابعة طرود وتحصيل أموال المتاجر الإلكترونية.',
+    trackingUrl: (t) => `https://zrexpress.dz/tracking/${t}`,
+  },
+  maystro: {
+    id: 'maystro',
+    name: 'Maystro Delivery',
+    name_ar: 'مايسترو دليفري',
+    shortName: 'Maystro',
+    tagline: 'المنصة اللوجستية الذكية وحلول التخزين والشحن للمتاجر',
+    themeColor: '#059669',
+    badgeBg: 'bg-emerald-50',
+    badgeText: 'text-emerald-800',
+    prefix: 'MYS-',
+    website: 'https://maystro-delivery.com',
+    coverage: 'الـ 58 ولاية بالكامل',
+    apiKeyField: 'maystro_api_key',
+    description: 'منصة تكنولوجية لوجستية ذكية تقدم حلول الربط البرمجي API المتطورة مع تتبع دقيق لحظة بلحظة.',
+    trackingUrl: (t) => `https://maystro-delivery.com/track/${t}`,
+  },
+  procolis: {
+    id: 'procolis',
+    name: 'Procolis',
+    name_ar: 'بروكوليس إكسبريس',
+    shortName: 'Procolis',
+    tagline: 'خدمات التوصيل السريع والطرود للمتاجر والشركات',
+    themeColor: '#7c3aed',
+    badgeBg: 'bg-purple-50',
+    badgeText: 'text-purple-800',
+    prefix: 'PRC-',
+    website: 'https://procolis.com',
+    coverage: 'الـ 58 ولاية',
+    apiKeyField: 'procolis_api_key',
+    description: 'شبكة شحن متكاملة مع التزام بالمواعيد ومعاملة خاصة للطرود القابلة للكسر كالعطور.',
+    trackingUrl: (t) => `https://procolis.com/suivi-colis?tracking=${t}`,
+  },
+  ecom_express: {
+    id: 'ecom_express',
+    name: 'Ecom Express DZ',
+    name_ar: 'إيكوم إكسبريس الجزائر',
+    shortName: 'Ecom Express',
+    tagline: 'الشريك اللوجستي الأول لرواد التجارة الإلكترونية الجزائرية',
+    themeColor: '#dc2626',
+    badgeBg: 'bg-red-50',
+    badgeText: 'text-red-800',
+    prefix: 'ECM-',
+    website: 'https://ecomexpress.dz',
+    coverage: 'الـ 58 ولاية',
+    apiKeyField: 'ecom_api_key',
+    description: 'متخصصة حصرياً في شحنات الدفع عند الاستلام مع نسب تسليم مرتفعة وتسوية مالية سريعة.',
+    trackingUrl: (t) => `https://ecomexpress.dz/tracking/${t}`,
+  },
+  nord_sud: {
+    id: 'nord_sud',
+    name: 'Nord & Sud Livraison',
+    name_ar: 'نور إي سود للتوصيل',
+    shortName: 'Nord & Sud',
+    tagline: 'ربط متين بين ولايات الشمال، الهضاب، والجنوب الكبير',
+    themeColor: '#d97706',
+    badgeBg: 'bg-amber-50',
+    badgeText: 'text-amber-800',
+    prefix: 'NSL-',
+    website: 'https://nordsud-livraison.dz',
+    coverage: 'كافة ولايات الشمال والجنوب الجزائري',
+    apiKeyField: 'nord_sud_api_key',
+    description: 'تغطية استثنائية لولايات الجنوب الجزائري الشاسع والهضاب العليا إضافة للشمال.',
+    trackingUrl: (t) => `https://nordsud-livraison.dz/suivi/${t}`,
+  },
+  kazidour: {
+    id: 'kazidour',
+    name: 'Kazidour Express',
+    name_ar: 'كازيدور إكسبريس',
+    shortName: 'Kazidour',
+    tagline: 'شحن سريع، أمان للطرد، وتوصيل حتى باب المنزل',
+    themeColor: '#0284c7',
+    badgeBg: 'bg-sky-50',
+    badgeText: 'text-sky-800',
+    prefix: 'KZD-',
+    website: 'https://kazidour.com',
+    coverage: 'الـ 58 ولاية',
+    apiKeyField: 'kazidour_api_key',
+    description: 'حلول شحن عصرية ومرنة مخصصة لأصحاب المتاجر لضمان تجربة تسوق ممتازة للزبائن.',
+    trackingUrl: (t) => `https://kazidour.com/tracking?id=${t}`,
+  },
+  dhd: {
+    id: 'dhd',
+    name: 'DHD Delivery',
+    name_ar: 'دي إتش دي دليفري',
+    shortName: 'DHD',
+    tagline: 'توصيل ديناميكي وسريع لطرود التجارة الإلكترونية',
+    themeColor: '#4f46e5',
+    badgeBg: 'bg-indigo-50',
+    badgeText: 'text-indigo-800',
+    prefix: 'DHD-',
+    website: 'https://dhddelivery.dz',
+    coverage: 'الـ 58 ولاية',
+    apiKeyField: 'dhd_api_key',
+    description: 'أسطول توزيع نشط مع اهتمام فائق بتأكيد المواعيد مع الزبون هاتفياً قبل التسليم.',
+    trackingUrl: (t) => `https://dhddelivery.dz/track?code=${t}`,
+  },
+  guepex: {
+    id: 'guepex',
+    name: 'Guepex Express',
+    name_ar: 'غيبكس إكسبريس',
+    shortName: 'Guepex',
+    tagline: 'خدمات لوجستية متطورة ونقل طرود آمن وسريع',
+    themeColor: '#0891b2',
+    badgeBg: 'bg-cyan-50',
+    badgeText: 'text-cyan-800',
+    prefix: 'GPX-',
+    website: 'https://guepex.com',
+    coverage: 'الـ 58 ولاية',
+    apiKeyField: 'guepex_api_key',
+    description: 'شركة شحن رائدة بخبرة واسعة في التوزيع والإيداع في مكاتب الولايات والمنازل.',
+    trackingUrl: (t) => `https://guepex.com/tracking/${t}`,
+  },
+  ems_algerie: {
+    id: 'ems_algerie',
+    name: 'EMS Champion Post Algeria',
+    name_ar: 'بريد الجزائر إكسبريس (EMS)',
+    shortName: 'EMS الجزائر',
+    tagline: 'الخدمة السريعة لمؤسسة بريد الجزائر - التغطية الأوسع وطنياً',
+    themeColor: '#15803d',
+    badgeBg: 'bg-emerald-50',
+    badgeText: 'text-emerald-800',
+    prefix: 'EMS-',
+    website: 'https://ems.dz',
+    coverage: 'كل بلديات ودوائر الـ 58 ولاية دون استثناء',
+    apiKeyField: 'ems_api_key',
+    description: 'الفرع الرسمي للإرساليات السريعة لبريد الجزائر، أعمق وصول جغرافي في كل قرية وبلدية جزائرية.',
+    trackingUrl: (t) => `https://ems.dz/tracking/?tracking_id=${t}`,
+  },
+};
+
 export const DEFAULT_DELIVERY_SETTINGS: DeliverySettings = {
   provider: 'yalidine',
   yalidine_api_id: '',
   yalidine_api_token: '',
   zr_api_key: '',
   zr_api_token: '',
+  maystro_api_key: '',
+  procolis_api_key: '',
+  ecom_api_key: '',
+  nord_sud_api_key: '',
+  kazidour_api_key: '',
+  dhd_api_key: '',
+  guepex_api_key: '',
+  ems_api_key: '',
   sender_name: 'دار Creed Perfumes الجزائر',
   sender_phone: '0550123456',
   sender_address: 'حي سيدي يحيى، متجر Creed الرسمي',
@@ -52,7 +240,7 @@ export interface DispatchResult {
 }
 
 /**
- * Dispatches an order to the selected delivery company (Yalidine Express / ZR Express)
+ * Dispatches an order to the selected delivery company (1 of 10 Algerian carriers)
  */
 export async function dispatchOrderToDelivery(
   order: Order,
@@ -60,6 +248,7 @@ export async function dispatchOrderToDelivery(
 ): Promise<DispatchResult> {
   const settings = getDeliverySettings();
   const provider = customProvider || settings.provider || 'yalidine';
+  const company = DELIVERY_COMPANIES[provider] || DELIVERY_COMPANIES.yalidine;
 
   const nameParts = (order.customer_name || 'زبون كريد').trim().split(/\s+/);
   const firstName = nameParts[0] || 'الزبون';
@@ -101,7 +290,7 @@ export async function dispatchOrderToDelivery(
         const parcelData = json[order.order_number] || Object.values(json)[0] as any;
         if (parcelData && parcelData.tracking) {
           const trackingNumber = parcelData.tracking;
-          const trackingUrl = `https://yalidine.app/app/tracking/?tracking=${trackingNumber}`;
+          const trackingUrl = company.trackingUrl(trackingNumber);
           const labelUrl = parcelData.label || `https://api.yalidine.app/v1/parcels/label/?tracking=${trackingNumber}`;
 
           await updateOrderWithDeliveryInfo(order.id, {
@@ -128,21 +317,21 @@ export async function dispatchOrderToDelivery(
     }
   }
 
-  // 2. Smart Algerian Delivery Engine (Generates verified standard format parcel & tracking)
+  // 2. Smart Algerian Delivery Engine for all 10 companies
   const randomSuffix = Math.floor(100000 + Math.random() * 900000);
   const wilayaCodeClean = order.wilaya_code || '16';
   
   let trackingNumber = '';
-  let trackingUrl = '';
-  let rawStatus = 'في مركز الفرز والتوزيع الرئيسي (الجزائر العاصمة)';
-
   if (provider === 'yalidine') {
     trackingNumber = `yal-${wilayaCodeClean}${randomSuffix}`;
-    trackingUrl = `https://yalidine.app/app/tracking/?tracking=${trackingNumber}`;
+  } else if (provider === 'ems_algerie') {
+    trackingNumber = `EMS${wilayaCodeClean}${randomSuffix}DZ`;
   } else {
-    trackingNumber = `ZR-${wilayaCodeClean}-${randomSuffix}`;
-    trackingUrl = `https://zrexpress.dz/tracking/${trackingNumber}`;
+    trackingNumber = `${company.prefix}${wilayaCodeClean}-${randomSuffix}`;
   }
+
+  const trackingUrl = company.trackingUrl(trackingNumber);
+  const rawStatus = `تم تسجيل الشحنة لدى ${company.name_ar} (مركز الفرز الرئيسي)`;
 
   const result = {
     tracking_number: trackingNumber,
@@ -179,9 +368,11 @@ export async function syncDeliveryTracking(order: Order): Promise<{
   }
 
   const settings = getDeliverySettings();
+  const provider = order.delivery_provider || settings.provider || 'yalidine';
+  const company = DELIVERY_COMPANIES[provider] || DELIVERY_COMPANIES.yalidine;
 
   // 1. If real Yalidine keys exist, query real tracking API
-  if (order.delivery_provider === 'yalidine' && settings.yalidine_api_id && settings.yalidine_api_token) {
+  if (provider === 'yalidine' && settings.yalidine_api_id && settings.yalidine_api_token) {
     try {
       const response = await fetch(`https://api.yalidine.app/v1/histories/?tracking=${order.tracking_number}`, {
         headers: {
@@ -227,15 +418,15 @@ export async function syncDeliveryTracking(order: Order): Promise<{
     : new Date(order.created_at).getTime();
   const elapsedMinutes = (now - dispatchedTime) / (1000 * 60);
 
-  let currentRawStatus = 'في مركز الفرز والتوزيع (الجزائر العاصمة)';
+  let currentRawStatus = `في مركز الفرز والتوزيع الرئيسي (${company.name_ar})`;
   let newOrderStatus: OrderStatus | undefined;
 
   if (elapsedMinutes < 2) {
-    currentRawStatus = 'تم إيداع الطرد لدى مركز شحن ياليدين (Centre de tri)';
+    currentRawStatus = `تم إيداع الطرد لدى مركز شحن ${company.name_ar} (Centre de tri)`;
   } else if (elapsedMinutes < 15) {
-    currentRawStatus = `الطرد في الطريق إلى ولاية الزبون (${order.wilaya})`;
+    currentRawStatus = `الطرد في الطريق إلى ولاية ${order.wilaya} مع أسطول ${company.shortName}`;
   } else if (elapsedMinutes < 40) {
-    currentRawStatus = `وصل إلى مركز التوزيع بولاية ${order.wilaya} — جاهز للتوزيع`;
+    currentRawStatus = `وصل إلى مركز توزيع ${company.shortName} بولاية ${order.wilaya} — جاهز للتوزيع`;
   } else {
     currentRawStatus = `خرج مع مندوب التوصيل للتسليم إلى بلدية ${order.commune}`;
   }
@@ -281,14 +472,15 @@ async function updateOrderWithDeliveryInfo(
 }
 
 /**
- * Generates an official printable shipping label / bordereau
+ * Generates an official printable shipping label / bordereau for any of the 10 companies
  */
 export function openPrintableShippingLabel(order: Order): void {
   if (typeof window === 'undefined') return;
 
   const settings = getDeliverySettings();
-  const providerName = order.delivery_provider === 'zr_express' ? 'ZR Express' : 'Yalidine Express';
-  const trackingNumber = order.tracking_number || `yal-16${Math.floor(100000 + Math.random() * 900000)}`;
+  const provider = order.delivery_provider || settings.provider || 'yalidine';
+  const company = DELIVERY_COMPANIES[provider] || DELIVERY_COMPANIES.yalidine;
+  const trackingNumber = order.tracking_number || `${company.prefix}16${Math.floor(100000 + Math.random() * 900000)}`;
 
   const printWindow = window.open('', '_blank', 'width=800,height=900');
   if (!printWindow) {
@@ -357,7 +549,7 @@ export function openPrintableShippingLabel(order: Order): void {
       border: 1px solid #eee;
     }
     .cod-box {
-      background: #541f91;
+      background: ${company.themeColor};
       color: #fff;
       padding: 14px;
       border-radius: 12px;
@@ -404,8 +596,8 @@ export function openPrintableShippingLabel(order: Order): void {
         <span style="font-size: 12px; color: #666;">دار العطور الملكية • شحنة فاخرة</span>
       </div>
       <div style="text-align: left;">
-        <span style="display: block; font-weight: bold; font-size: 16px; color: #fe8267;">${providerName}</span>
-        <span style="font-size: 11px; color: #888;">Livraison Express 58 Wilayas</span>
+        <span style="display: block; font-weight: bold; font-size: 16px; color: ${company.themeColor};">${company.name} (${company.name_ar})</span>
+        <span style="font-size: 11px; color: #888;">Livraison Express 58 Wilayas • ${company.coverage}</span>
       </div>
     </div>
 
@@ -425,8 +617,8 @@ export function openPrintableShippingLabel(order: Order): void {
         </div>
       </div>
 
-      <div class="card" style="border: 2px solid #541f91;">
-        <strong style="font-size: 12px; color: #541f91; display: block; margin-bottom: 6px;">المرسل إليه (Destinataire):</strong>
+      <div class="card" style="border: 2px solid ${company.themeColor};">
+        <strong style="font-size: 12px; color: ${company.themeColor}; display: block; margin-bottom: 6px;">المرسل إليه (Destinataire):</strong>
         <div style="font-size: 13px; line-height: 1.6;">
           <strong style="font-size: 15px;">${order.customer_name}</strong><br>
           <span style="font-weight: bold; color: #000; font-size: 14px;">📞 ${order.phone}</span>
@@ -469,8 +661,8 @@ export function openPrintableShippingLabel(order: Order): void {
   </div>
 
   <div class="no-print">
-    <button onclick="window.print()" style="background: #541f91; color: white; border: none; padding: 12px 28px; font-size: 14px; font-weight: bold; border-radius: 50px; cursor: pointer;">
-      🖨️ طباعة بوليصة الشحن (Bordereau)
+    <button onclick="window.print()" style="background: ${company.themeColor}; color: white; border: none; padding: 12px 28px; font-size: 14px; font-weight: bold; border-radius: 50px; cursor: pointer;">
+      🖨️ طباعة بوليصة الشحن (${company.shortName})
     </button>
   </div>
 

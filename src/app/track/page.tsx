@@ -19,6 +19,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { getOrdersByPhone } from '@/lib/store';
+import { DELIVERY_COMPANIES } from '@/lib/delivery/manager';
 import { Order, OrderStatus } from '@/types';
 
 export default function TrackOrderPage() {
@@ -302,52 +303,59 @@ export default function TrackOrderPage() {
                       </div>
                     )}
 
-                    {/* Delivery Partner Tracking Card (Yalidine / ZR Express) */}
-                    {order.tracking_number && (
-                      <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 p-4 sm:p-5 rounded-2xl border border-blue-200/80 space-y-3 shadow-sm">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0">
-                              <Truck className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-black text-blue-950">
-                                  شركة التوصيل المعتمدة: {order.delivery_provider === 'zr_express' ? 'ZR Express' : 'Yalidine Express'}
-                                </span>
-                                <span className="px-2 py-0.5 rounded-full bg-blue-200/70 text-blue-900 font-bold text-[10px]">
-                                  شحنة رسمية
+                    {/* Delivery Partner Tracking Card (10 Algerian Carriers) */}
+                    {order.tracking_number && (() => {
+                      const comp = DELIVERY_COMPANIES[order.delivery_provider || 'yalidine'] || DELIVERY_COMPANIES.yalidine;
+                      return (
+                        <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 p-4 sm:p-5 rounded-2xl border border-blue-200/80 space-y-3 shadow-sm">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div 
+                                className="w-10 h-10 rounded-2xl text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0"
+                                style={{ backgroundColor: comp.themeColor }}
+                              >
+                                <Truck className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-black text-blue-950">
+                                    شركة التوصيل المعتمدة: {comp.name_ar} ({comp.name})
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-full bg-blue-200/70 text-blue-900 font-bold text-[10px]">
+                                    شحنة رسمية
+                                  </span>
+                                </div>
+                                <span className="text-xs text-blue-800 block mt-0.5">
+                                  كود تتبع الطرد: <strong className="font-mono text-sm font-black text-blue-950 tracking-wider" dir="ltr">{order.tracking_number}</strong>
                                 </span>
                               </div>
-                              <span className="text-xs text-blue-800 block mt-0.5">
-                                كود تتبع الطرد: <strong className="font-mono text-sm font-black text-blue-950 tracking-wider" dir="ltr">{order.tracking_number}</strong>
+                            </div>
+
+                            {order.delivery_tracking_url && (
+                              <a
+                                href={order.delivery_tracking_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn-pill hover:opacity-90 text-white text-xs py-2 px-3.5 font-bold flex items-center justify-center gap-1.5 self-start sm:self-auto shadow-sm transition-all"
+                                style={{ backgroundColor: comp.themeColor }}
+                              >
+                                <span>تتبع لدى {comp.shortName}</span>
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                          </div>
+
+                          {order.delivery_status_raw && (
+                            <div className="bg-white/90 p-3 rounded-xl border border-blue-100 flex items-center gap-2.5 text-xs text-blue-900">
+                              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                              <span>
+                                الحالة الحية الآن: <strong className="font-bold text-on-surface">{order.delivery_status_raw}</strong>
                               </span>
                             </div>
-                          </div>
-
-                          {order.delivery_tracking_url && (
-                            <a
-                              href={order.delivery_tracking_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="btn-pill bg-blue-600 hover:bg-blue-700 text-white text-xs py-2 px-3.5 font-bold flex items-center justify-center gap-1.5 self-start sm:self-auto shadow-sm transition-all"
-                            >
-                              <span>تتبع لدى {order.delivery_provider === 'zr_express' ? 'ZR' : 'ياليدين'}</span>
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
                           )}
                         </div>
-
-                        {order.delivery_status_raw && (
-                          <div className="bg-white/90 p-3 rounded-xl border border-blue-100 flex items-center gap-2.5 text-xs text-blue-900">
-                            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                            <span>
-                              الحالة الحية الآن: <strong className="font-bold text-on-surface">{order.delivery_status_raw}</strong>
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Items Ordered */}
                     <div className="bg-surface-container-low p-4 rounded-2xl space-y-3 border border-primary/5">

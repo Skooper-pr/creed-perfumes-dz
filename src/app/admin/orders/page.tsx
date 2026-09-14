@@ -30,9 +30,10 @@ import { exportOrdersToExcel } from '@/lib/exportOrders';
 import { 
   dispatchOrderToDelivery, 
   syncDeliveryTracking, 
-  openPrintableShippingLabel 
+  openPrintableShippingLabel,
+  DELIVERY_COMPANIES
 } from '@/lib/delivery/manager';
-import { Order, OrderStatus } from '@/types';
+import { Order, OrderStatus, DeliveryProvider } from '@/types';
 import { ALGERIA_WILAYAS } from '@/data/wilayas';
 
 export default function AdminOrdersPage() {
@@ -45,6 +46,7 @@ export default function AdminOrdersPage() {
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
+  const [selectedDispatchCompany, setSelectedDispatchCompany] = useState<DeliveryProvider>('yalidine');
 
   const loadOrders = async () => {
     try {
@@ -63,12 +65,13 @@ export default function AdminOrdersPage() {
     return () => unsubscribe();
   }, []);
 
-  const handleDispatchOrder = async (order: Order) => {
+  const handleDispatchOrder = async (order: Order, customProvider?: DeliveryProvider) => {
     setActionLoadingId(order.id);
     try {
-      const res = await dispatchOrderToDelivery(order);
+      const res = await dispatchOrderToDelivery(order, customProvider);
       if (res.success) {
-        setStatusNotice(`تم إرسال الطلبية بنجاح إلى شركة التوصيل (${res.provider})! رقم التتبع: ${res.tracking_number}`);
+        const compName = DELIVERY_COMPANIES[res.provider]?.name_ar || res.provider;
+        setStatusNotice(`تم إرسال الطلبية بنجاح إلى شركة التوصيل (${compName})! رقم التتبع: ${res.tracking_number}`);
         setTimeout(() => setStatusNotice(null), 6000);
         await loadOrders();
         if (activeOrder && activeOrder.id === order.id) {
@@ -416,6 +419,8 @@ export default function AdminOrdersPage() {
               bg: 'bg-surface-container',
               text: 'text-on-surface',
             };
+            const comp = DELIVERY_COMPANIES[order.delivery_provider || 'yalidine'] || DELIVERY_COMPANIES.yalidine;
+
             return (
               <div
                 key={order.id}
@@ -460,13 +465,20 @@ export default function AdminOrdersPage() {
                     {/* Delivery & Tracking Badge snippet */}
                     {order.tracking_number ? (
                       <div className="flex flex-wrap items-center gap-2 pt-1.5">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-900 border border-blue-200 text-[11px] font-bold">
-                          <Truck className="w-3 h-3 text-blue-600 shrink-0" />
-                          <span className="uppercase">{order.delivery_provider === 'zr_express' ? 'ZR Express' : 'Yalidine'}</span>
+                        <span 
+                          className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg border text-[11px] font-bold"
+                          style={{
+                            backgroundColor: `${comp.themeColor}12`,
+                            borderColor: `${comp.themeColor}35`,
+                            color: comp.themeColor
+                          }}
+                        >
+                          <Truck className="w-3 h-3 shrink-0" />
+                          <span>{comp.name_ar}</span>
                           <span className="font-mono font-black" dir="ltr">{order.tracking_number}</span>
                         </span>
                         {order.delivery_status_raw && (
-                          <span className="text-[10px] text-blue-800 bg-blue-50/50 px-2 py-0.5 rounded border border-blue-100">
+                          <span className="text-[10px] text-on-surface-variant bg-surface-container px-2 py-0.5 rounded border border-primary/5">
                             {order.delivery_status_raw}
                           </span>
                         )}
@@ -651,86 +663,113 @@ export default function AdminOrdersPage() {
             </div>
 
             {/* Delivery Company Integration Section */}
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200/70 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-purple-700" />
-                  <span className="text-xs font-black text-purple-900">
-                    بيانات الشحن وشركة التوصيل ({activeOrder.delivery_provider === 'zr_express' ? 'ZR Express' : 'Yalidine Express'})
-                  </span>
-                </div>
-                {activeOrder.tracking_number && (
-                  <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-mono font-bold text-xs" dir="ltr">
-                    {activeOrder.tracking_number}
-                  </span>
-                )}
-              </div>
-
-              {activeOrder.tracking_number ? (
-                <div className="space-y-2.5 text-xs">
-                  <div className="bg-white/80 p-3 rounded-xl border border-purple-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                      <span className="text-[11px] text-on-surface-variant block">الحالة الحية لدى شركة التوصيل:</span>
-                      <span className="font-bold text-on-surface">
-                        {activeOrder.delivery_status_raw || 'في مركز الفرز والتوزيع'}
+            {(() => {
+              const activeCompany = DELIVERY_COMPANIES[activeOrder.delivery_provider || 'yalidine'] || DELIVERY_COMPANIES.yalidine;
+              return (
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200/70 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Truck className="w-4 h-4 text-purple-700" />
+                      <span className="text-xs font-black text-purple-900">
+                        بيانات الشحن وشركة التوصيل ({activeCompany.name_ar} — {activeCompany.name})
                       </span>
-                      {activeOrder.last_delivery_sync && (
-                        <span className="text-[10px] text-outline block mt-0.5">
-                          آخر مزامنة: {new Date(activeOrder.last_delivery_sync).toLocaleTimeString('ar-DZ')}
-                        </span>
-                      )}
                     </div>
-
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => handleSyncOrder(activeOrder)}
-                        disabled={actionLoadingId === activeOrder.id}
-                        className="btn-pill-outline text-xs py-1.5 px-3 flex items-center gap-1 border-blue-300 text-blue-700 hover:bg-blue-50 font-bold"
-                        title="مزامنة الحالة الحية الحالية مع شركة التوصيل"
+                    {activeOrder.tracking_number && (
+                      <span 
+                        className="px-2.5 py-0.5 rounded-full font-mono font-bold text-xs border"
+                        style={{
+                          backgroundColor: `${activeCompany.themeColor}15`,
+                          color: activeCompany.themeColor,
+                          borderColor: `${activeCompany.themeColor}40`,
+                        }}
+                        dir="ltr"
                       >
-                        <RefreshCw className={`w-3 h-3 ${actionLoadingId === activeOrder.id ? 'animate-spin' : ''}`} />
-                        <span>مزامنة الحالة</span>
-                      </button>
-
-                      <button
-                        onClick={() => openPrintableShippingLabel(activeOrder)}
-                        className="btn-pill bg-purple-700 hover:bg-purple-800 text-white text-xs py-1.5 px-3 flex items-center gap-1 font-bold shadow-sm"
-                        title="طباعة بوليصة الشحن (Bordereau)"
-                      >
-                        <Printer className="w-3 h-3" />
-                        <span>طباعة البوليصة</span>
-                      </button>
-                    </div>
+                        {activeOrder.tracking_number}
+                      </span>
+                    )}
                   </div>
 
-                  {activeOrder.delivery_tracking_url && (
-                    <a
-                      href={activeOrder.delivery_tracking_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-purple-700 hover:underline text-[11px] font-bold"
-                    >
-                      <span>رابط التتبع الرسمي على موقع {activeOrder.delivery_provider === 'zr_express' ? 'ZR Express' : 'Yalidine Express'}</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
+                  {activeOrder.tracking_number ? (
+                    <div className="space-y-2.5 text-xs">
+                      <div className="bg-white/80 p-3 rounded-xl border border-purple-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[11px] text-on-surface-variant block">الحالة الحية لدى شركة التوصيل:</span>
+                          <span className="font-bold text-on-surface">
+                            {activeOrder.delivery_status_raw || 'في مركز الفرز والتوزيع'}
+                          </span>
+                          {activeOrder.last_delivery_sync && (
+                            <span className="text-[10px] text-outline block mt-0.5">
+                              آخر مزامنة: {new Date(activeOrder.last_delivery_sync).toLocaleTimeString('ar-DZ')}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => handleSyncOrder(activeOrder)}
+                            disabled={actionLoadingId === activeOrder.id}
+                            className="btn-pill-outline text-xs py-1.5 px-3 flex items-center gap-1 border-blue-300 text-blue-700 hover:bg-blue-50 font-bold"
+                            title="مزامنة الحالة الحية الحالية مع شركة التوصيل"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${actionLoadingId === activeOrder.id ? 'animate-spin' : ''}`} />
+                            <span>مزامنة الحالة</span>
+                          </button>
+
+                          <button
+                            onClick={() => openPrintableShippingLabel(activeOrder)}
+                            className="btn-pill bg-purple-700 hover:bg-purple-800 text-white text-xs py-1.5 px-3 flex items-center gap-1 font-bold shadow-sm"
+                            title="طباعة بوليصة الشحن (Bordereau)"
+                          >
+                            <Printer className="w-3 h-3" />
+                            <span>طباعة البوليصة</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {activeOrder.delivery_tracking_url && (
+                        <a
+                          href={activeOrder.delivery_tracking_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-purple-700 hover:underline text-[11px] font-bold"
+                        >
+                          <span>رابط التتبع الرسمي على موقع {activeCompany.name} ({activeCompany.name_ar})</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3 text-xs">
+                      <p className="text-on-surface-variant leading-relaxed">
+                        لم يتم تصدير هذه الطلبية لشركة التوصيل بعد. يمكنك اختيار شركة التوصيل المناسبة من بين <strong>الـ 10 شركات المتاحة</strong> ثم الإرسال بنقرة واحدة:
+                      </p>
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <select
+                          value={selectedDispatchCompany}
+                          onChange={(e) => setSelectedDispatchCompany(e.target.value as DeliveryProvider)}
+                          className="bg-white text-on-surface text-xs font-bold px-3 py-2.5 rounded-xl border border-purple-200 outline-none flex-1 focus:ring-2 focus:ring-purple-500 cursor-pointer"
+                        >
+                          {Object.values(DELIVERY_COMPANIES).map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name_ar} ({c.name}) — {c.coverage}
+                            </option>
+                          ))}
+                        </select>
+
+                        <button
+                          onClick={() => handleDispatchOrder(activeOrder, selectedDispatchCompany)}
+                          disabled={actionLoadingId === activeOrder.id}
+                          className="btn-pill bg-purple-700 hover:bg-purple-800 text-white text-xs py-2.5 px-4 font-bold flex items-center justify-center gap-1.5 shrink-0 shadow-sm transition-all"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>{actionLoadingId === activeOrder.id ? 'جاري الإرسال...' : `إرسال إلى ${DELIVERY_COMPANIES[selectedDispatchCompany]?.shortName || 'التوصيل'}`}</span>
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
-              ) : (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                  <p className="text-on-surface-variant">
-                    لم يتم تصدير هذه الطلبية لشركة التوصيل بعد. يمكنك إرسالها الآن بنقرة واحدة لتوليد رقم التتبع وبوليصة الشحن.
-                  </p>
-                  <button
-                    onClick={() => handleDispatchOrder(activeOrder)}
-                    disabled={actionLoadingId === activeOrder.id}
-                    className="btn-pill bg-purple-700 hover:bg-purple-800 text-white text-xs py-2 px-4 font-bold flex items-center justify-center gap-1.5 shrink-0 shadow-sm"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>{actionLoadingId === activeOrder.id ? 'جاري الإرسال...' : 'إرسال لشركة التوصيل الآن'}</span>
-                  </button>
-                </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* Status Change Control */}
             <div className="space-y-2 pt-2 border-t border-primary/10">

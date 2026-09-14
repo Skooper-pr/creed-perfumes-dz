@@ -48,6 +48,18 @@ export interface OrderItem {
   image: string;
 }
 
+export type DeliveryProvider = 
+  | 'yalidine' 
+  | 'zr_express' 
+  | 'maystro' 
+  | 'procolis' 
+  | 'ecom_express' 
+  | 'nord_sud' 
+  | 'kazidour' 
+  | 'dhd' 
+  | 'guepex' 
+  | 'ems_algerie';
+
 export interface Order {
   id: string;
   order_number: string;
@@ -65,7 +77,7 @@ export interface Order {
   status: OrderStatus;
   stock_deducted?: boolean;
   tracking_number?: string;
-  delivery_provider?: 'yalidine' | 'zr_express' | 'other';
+  delivery_provider?: DeliveryProvider;
   delivery_tracking_url?: string;
   shipping_label_url?: string;
   delivery_status_raw?: string;
@@ -73,14 +85,20 @@ export interface Order {
   created_at: string;
 }
 
-export type DeliveryProvider = 'yalidine' | 'zr_express';
-
 export interface DeliverySettings {
   provider: DeliveryProvider;
   yalidine_api_id: string;
   yalidine_api_token: string;
   zr_api_key: string;
   zr_api_token: string;
+  maystro_api_key?: string;
+  procolis_api_key?: string;
+  ecom_api_key?: string;
+  nord_sud_api_key?: string;
+  kazidour_api_key?: string;
+  dhd_api_key?: string;
+  guepex_api_key?: string;
+  ems_api_key?: string;
   sender_name: string;
   sender_phone: string;
   sender_address: string;

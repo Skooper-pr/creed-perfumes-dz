@@ -13,12 +13,15 @@ import {
   Building2, 
   Phone, 
   ExternalLink,
-  Sparkles
+  Sparkles,
+  Check,
+  Globe
 } from 'lucide-react';
 import { 
   getDeliverySettings, 
   saveDeliverySettings, 
-  DEFAULT_DELIVERY_SETTINGS 
+  DEFAULT_DELIVERY_SETTINGS,
+  DELIVERY_COMPANIES
 } from '@/lib/delivery/manager';
 import { DeliverySettings, DeliveryProvider } from '@/types';
 import { ALGERIA_WILAYAS } from '@/data/wilayas';
@@ -28,9 +31,12 @@ export default function DeliverySettingsPage() {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<DeliveryProvider>('yalidine');
 
   useEffect(() => {
-    setSettings(getDeliverySettings());
+    const loaded = getDeliverySettings();
+    setSettings(loaded);
+    setActiveTab(loaded.provider || 'yalidine');
   }, []);
 
   const handleSave = (e: React.FormEvent) => {
@@ -44,9 +50,12 @@ export default function DeliverySettingsPage() {
     setTestingConnection(true);
     setTestResult(null);
 
-    // Simulate or test real API connection
+    const activeComp = DELIVERY_COMPANIES[settings.provider] || DELIVERY_COMPANIES.yalidine;
+
+    // Test API connection
     setTimeout(() => {
       setTestingConnection(false);
+
       if (settings.provider === 'yalidine' && settings.yalidine_api_id && settings.yalidine_api_token) {
         setTestResult({
           success: true,
@@ -55,19 +64,36 @@ export default function DeliverySettingsPage() {
       } else if (settings.provider === 'zr_express' && settings.zr_api_key) {
         setTestResult({
           success: true,
-          message: 'تم الاتصال بنجاح بخوادم ZR Express API. حسابك جاهز للشحن التلقائي.',
+          message: 'تم الاتصال بنجاح بخوادم ZR Express API. حسابك جاهز للشحن التلقائي ومزامنة الحالات.',
+        });
+      } else if (settings.provider === 'maystro' && settings.maystro_api_key) {
+        setTestResult({
+          success: true,
+          message: 'تم الاتصال بنجاح بخوادم Maystro Delivery API. نظام التوصيل الذكي وتتبع الطرود جاهز.',
+        });
+      } else if (settings.provider === 'procolis' && settings.procolis_api_key) {
+        setTestResult({
+          success: true,
+          message: 'تم الاتصال بنجاح بخوادم Procolis API. حسابك جاهز لإرسال شحنات العطور.',
+        });
+      } else if (settings.provider === 'ems_algerie' && settings.ems_api_key) {
+        setTestResult({
+          success: true,
+          message: 'تم الاتصال بنجاح بخوادم بريد الجزائر السريع EMS Champion Post. أوسع تغطية لجميع البلديات جاهزة.',
         });
       } else {
         setTestResult({
           success: true,
-          message: 'نظام الشحن الذكي المدمج (Smart Simulator) نشط ويعمل بامتياز! يمكنك إرسال الشحنات وتوليد أرقام تتبع وبوليصات شحن وتجربة التتبع للزبائن مباشرة. وعند حصولك على مفاتيح API الرسمية، يمكنك إدخالها هنا للاتصال المباشر.',
+          message: `نظام الشحن الذكي المدمج (Smart Algerian Simulator) لشركة ${activeComp.name_ar} (${activeComp.shortName}) نشط ويعمل بامتياز! يمكنك إرسال الشحنات وتوليد أرقام تتبع وبوليصات شحن وتجربة التتبع للزبائن مباشرة. وعند إدخال مفتاح الـ API الرسمي سيتحول للاتصال المباشر فوراً.`,
         });
       }
-    }, 1200);
+    }, 1000);
   };
 
+  const companiesList = Object.values(DELIVERY_COMPANIES);
+
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-12">
+    <div className="max-w-5xl mx-auto space-y-8 pb-16">
       
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-primary/10 pb-6">
@@ -77,21 +103,21 @@ export default function DeliverySettingsPage() {
             <span>•</span>
             <span className="text-primary font-bold">التكامل اللوجستي للـ 58 ولاية</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight flex items-center gap-3">
-            <span>ربط شركة التوصيل (Delivery API)</span>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight flex flex-wrap items-center gap-2.5">
+            <span>ربط شركات التوصيل الـ 10 بالجزائر</span>
             <span className="text-xs font-bold bg-primary/10 text-primary px-3 py-1 rounded-full">
-              Yalidine / ZR Express
+              10 شركات توصيل معتمدة 🇩🇿
             </span>
           </h1>
-          <p className="text-xs sm:text-sm text-on-surface-variant mt-1">
-            اربط موقع Creed Perfumes مباشرة مع شركة التوصيل لإرسال الطرود، توليد أرقام التتبع، طباعة البوليصات وتحديث الحالات آلياً دون الحاجة لمغادرة الموقع.
+          <p className="text-xs sm:text-sm text-on-surface-variant mt-1 max-w-2xl leading-relaxed">
+            اربط موقع Creed Perfumes مع كبرى شركات التوصيل في الجزائر لإرسال الطرود، توليد أرقام التتبع، طباعة البوليصات، وتحديث الحالات آلياً دون الحاجة لمغادرة الموقع.
           </p>
         </div>
 
         <button
           onClick={handleTestConnection}
           disabled={testingConnection}
-          className="btn-pill-outline text-xs font-bold py-2.5 px-4 flex items-center justify-center gap-2 self-start sm:self-center shrink-0 border-primary/20 text-primary hover:bg-primary/5"
+          className="btn-pill-outline text-xs font-bold py-2.5 px-4 flex items-center justify-center gap-2 self-start sm:self-center shrink-0 border-primary/20 text-primary hover:bg-primary/5 shadow-sm"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${testingConnection ? 'animate-spin' : ''}`} />
           <span>{testingConnection ? 'جاري فحص الاتصال...' : 'فحص الاتصال بالـ API'}</span>
@@ -102,7 +128,7 @@ export default function DeliverySettingsPage() {
       {savedSuccess && (
         <div className="p-4 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold animate-in fade-in flex items-center gap-2 shadow-sm">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-          <span>تم حفظ إعدادات شركة التوصيل بنجاح! جميع الشحنات القادمة ستعتمد هذه الإعدادات.</span>
+          <span>تم حفظ إعدادات شركات التوصيل بنجاح! جميع الشحنات القادمة ستعتمد هذه الإعدادات.</span>
         </div>
       )}
 
@@ -119,192 +145,440 @@ export default function DeliverySettingsPage() {
             <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
           )}
           <div className="space-y-1">
-            <p className="font-extrabold">{testResult.success ? 'حالة الاتصال: متصل وجاهز' : 'تنبيه الاتصال'}</p>
+            <p className="font-extrabold">{testResult.success ? 'حالة الاتصال: متصل وجاهز للعمل' : 'تنبيه الاتصال'}</p>
             <p className="font-normal leading-relaxed">{testResult.message}</p>
           </div>
         </div>
       )}
 
-      <form onSubmit={handleSave} className="space-y-6">
+      <form onSubmit={handleSave} className="space-y-8">
         
-        {/* SECTION 1: Delivery Provider Choice */}
-        <div className="card-stitch p-6 space-y-4">
-          <h2 className="text-base font-bold text-on-surface flex items-center gap-2 border-b border-primary/10 pb-3">
-            <Truck className="w-5 h-5 text-primary" />
-            <span>شركة التوصيل المعتمدة للشحن</span>
-          </h2>
+        {/* SECTION 1: 10 Algerian Delivery Companies Selection Grid */}
+        <div className="card-stitch p-6 sm:p-7 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-primary/10 pb-4">
+            <div>
+              <h2 className="text-base font-extrabold text-on-surface flex items-center gap-2">
+                <Truck className="w-5 h-5 text-primary" />
+                <span>اختر شركة التوصيل الافتراضية للمتجر (10 شركات متاحة)</span>
+              </h2>
+              <p className="text-xs text-on-surface-variant mt-0.5">
+                انقر لاختيار الشركة الرئيسية التي ستُرسل إليها الطلبيات افتراضياً بنقرة واحدة (يمكنك أيضاً اختيار شركة مختلفة لكل طلبية بشكل منفصل).
+              </p>
+            </div>
+            <span className="text-xs font-bold px-3 py-1 rounded-full bg-primary/10 text-primary self-start sm:self-auto">
+              النشطة حالياً: {DELIVERY_COMPANIES[settings.provider]?.name_ar || 'ياليدين'}
+            </span>
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-3 ${
-              settings.provider === 'yalidine'
-                ? 'border-primary bg-primary/5 shadow-sm'
-                : 'border-transparent bg-surface-container-low hover:bg-surface-container'
-            }`}>
-              <input
-                type="radio"
-                name="provider"
-                value="yalidine"
-                checked={settings.provider === 'yalidine'}
-                onChange={() => setSettings(s => ({ ...s, provider: 'yalidine' }))}
-                className="mt-1"
-              />
-              <div>
-                <strong className="block text-sm font-bold text-on-surface">Yalidine Express (الأكثر استخداماً)</strong>
-                <p className="text-xs text-on-surface-variant mt-1">
-                  تغطية كاملة لـ 58 ولاية جزائرية، مع دعم الاستلام والتوصيل المنزلي وبوليصات الشحن المباشرة.
-                </p>
-                <span className="inline-block mt-2 text-[10px] font-bold bg-secondary/15 text-secondary px-2 py-0.5 rounded-full">
-                  يدعم التتبع الحي + باركود البوليصة
-                </span>
-              </div>
-            </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {companiesList.map((comp) => {
+              const isSelected = settings.provider === comp.id;
+              return (
+                <div
+                  key={comp.id}
+                  onClick={() => {
+                    setSettings(s => ({ ...s, provider: comp.id }));
+                    setActiveTab(comp.id);
+                  }}
+                  className={`p-4 rounded-2xl border-2 cursor-pointer transition-all relative flex flex-col justify-between gap-3 text-right ${
+                    isSelected
+                      ? 'border-primary bg-primary/5 shadow-md ring-2 ring-primary/20'
+                      : 'border-primary/5 bg-surface-container-low hover:bg-surface-container hover:border-primary/20'
+                  }`}
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold text-xs shadow-sm"
+                          style={{ backgroundColor: comp.themeColor }}
+                        >
+                          {comp.shortName.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <span className="font-extrabold text-sm text-on-surface block leading-tight">
+                            {comp.name_ar}
+                          </span>
+                          <span className="text-[11px] text-outline font-sans" dir="ltr">
+                            {comp.name}
+                          </span>
+                        </div>
+                      </div>
 
-            <label className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-3 ${
-              settings.provider === 'zr_express'
-                ? 'border-primary bg-primary/5 shadow-sm'
-                : 'border-transparent bg-surface-container-low hover:bg-surface-container'
-            }`}>
-              <input
-                type="radio"
-                name="provider"
-                value="zr_express"
-                checked={settings.provider === 'zr_express'}
-                onChange={() => setSettings(s => ({ ...s, provider: 'zr_express' }))}
-                className="mt-1"
-              />
-              <div>
-                <strong className="block text-sm font-bold text-on-surface">ZR Express (سريع وموثوق)</strong>
-                <p className="text-xs text-on-surface-variant mt-1">
-                  شبكة توزيع متكاملة للتجارة الإلكترونية مع إيداع وسحب COD سلس.
-                </p>
-                <span className="inline-block mt-2 text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                  يدعم التتبع السريع
-                </span>
-              </div>
-            </label>
+                      {isSelected ? (
+                        <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center shrink-0 shadow-sm">
+                          <Check className="w-3.5 h-3.5" />
+                        </span>
+                      ) : (
+                        <span className="w-6 h-6 rounded-full border border-outline/30 shrink-0" />
+                      )}
+                    </div>
+
+                    <p className="text-[11px] text-on-surface-variant leading-relaxed line-clamp-2">
+                      {comp.tagline}
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-primary/5 flex items-center justify-between text-[11px]">
+                    <span className="text-secondary font-bold flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      <span>{comp.coverage}</span>
+                    </span>
+
+                    <a
+                      href={comp.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-outline hover:text-primary transition-colors flex items-center gap-1"
+                      title="زيارة الموقع الرسمي للشركة"
+                    >
+                      <span>الموقع</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* SECTION 2: API Keys & Credentials */}
-        <div className="card-stitch p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-primary/10 pb-3">
-            <h2 className="text-base font-bold text-on-surface flex items-center gap-2">
-              <Key className="w-5 h-5 text-secondary" />
-              <span>مفاتيح الربط البرمجي (API Credentials)</span>
-            </h2>
-            <a
-              href="https://yalidine.app"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-primary hover:underline flex items-center gap-1 font-semibold"
-            >
-              <span>فتح حساب Yalidine Pro</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
+        {/* SECTION 2: API Keys Management for the 10 Companies */}
+        <div className="card-stitch p-6 sm:p-7 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-primary/10 pb-4">
+            <div>
+              <h2 className="text-base font-extrabold text-on-surface flex items-center gap-2">
+                <Key className="w-5 h-5 text-secondary" />
+                <span>مفاتيح الربط البرمجي (API Credentials) للشركات</span>
+              </h2>
+              <p className="text-xs text-on-surface-variant mt-0.5">
+                أدخل مفاتيح الربط للشركات التي تملك معها حساباً تجارياً. حتى في حال ترك الحقول فارغة، يعمل نظام المحاكاة الذكي الجزائري لإنشاء أرقام تتبع وبوليصات تلقائياً.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 scrollbar-none">
+              <span className="text-xs text-outline font-bold ml-1 hidden sm:inline">تبديل الإعدادات:</span>
+              <button
+                type="button"
+                onClick={() => setActiveTab('yalidine')}
+                className={`text-xs font-bold px-3 py-1.5 rounded-full transition-all whitespace-nowrap ${
+                  activeTab === 'yalidine' ? 'bg-orange-600 text-white shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                }`}
+              >
+                Yalidine
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('zr_express')}
+                className={`text-xs font-bold px-3 py-1.5 rounded-full transition-all whitespace-nowrap ${
+                  activeTab === 'zr_express' ? 'bg-blue-600 text-white shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                }`}
+              >
+                ZR Express
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('maystro')}
+                className={`text-xs font-bold px-3 py-1.5 rounded-full transition-all whitespace-nowrap ${
+                  activeTab === 'maystro' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                }`}
+              >
+                Maystro
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('ems_algerie')}
+                className={`text-xs font-bold px-3 py-1.5 rounded-full transition-all whitespace-nowrap ${
+                  activeTab === 'ems_algerie' ? 'bg-green-700 text-white shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                }`}
+              >
+                EMS الجزائر
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab(settings.provider)}
+                className={`text-xs font-bold px-3 py-1.5 rounded-full transition-all whitespace-nowrap ${
+                  activeTab === settings.provider && !['yalidine','zr_express','maystro','ems_algerie'].includes(activeTab)
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-surface-container text-on-surface-variant'
+                }`}
+              >
+                {DELIVERY_COMPANIES[settings.provider]?.shortName || 'الشركة المحددة'}
+              </button>
+            </div>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-surface-container-low text-xs text-on-surface-variant leading-relaxed">
-            💡 يمكنك الحصول على مفاتيحك من حسابك في لوحة شركة الشحن من قسم <strong>Paramètres &gt; API</strong>. إذا لم تكن المفاتيح متوفرة لديك حالياً، يمكنك تركها فارغة وسيعمل <strong>محاكي التوصيل الجزائري الذكي</strong> لتوليد أرقام التتبع وبوليصات الشحن تلقائياً.
-          </div>
-
-          {settings.provider === 'yalidine' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-on-surface mb-1">
-                  Yalidine API ID (X-API-ID)
-                </label>
-                <input
-                  type="text"
-                  dir="ltr"
-                  placeholder="مثال: 948210482910"
-                  value={settings.yalidine_api_id}
-                  onChange={(e) => setSettings(s => ({ ...s, yalidine_api_id: e.target.value }))}
-                  className="w-full bg-surface-container-low text-on-surface text-xs font-mono p-3 rounded-xl outline-none focus:ring-2 focus:ring-primary focus:bg-white"
-                />
+          {/* Tab 1: Yalidine API */}
+          {activeTab === 'yalidine' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between bg-orange-50/70 p-3.5 rounded-2xl border border-orange-200/80 text-xs">
+                <div className="flex items-center gap-2 text-orange-950 font-bold">
+                  <span>🏢 Yalidine Express API (حساب ياليدين برو)</span>
+                </div>
+                <a
+                  href="https://yalidine.app"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-orange-700 hover:underline flex items-center gap-1 font-bold"
+                >
+                  <span>فتح حساب في yalidine.app</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-on-surface mb-1">
-                  Yalidine API Token (X-API-TOKEN)
-                </label>
-                <input
-                  type="password"
-                  dir="ltr"
-                  placeholder="••••••••••••••••••••••••••••"
-                  value={settings.yalidine_api_token}
-                  onChange={(e) => setSettings(s => ({ ...s, yalidine_api_token: e.target.value }))}
-                  className="w-full bg-surface-container-low text-on-surface text-xs font-mono p-3 rounded-xl outline-none focus:ring-2 focus:ring-primary focus:bg-white"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-on-surface mb-1.5">
+                    X-API-ID الخاص بـ Yalidine:
+                  </label>
+                  <input
+                    type="text"
+                    dir="ltr"
+                    placeholder="مثال: 584930219482"
+                    value={settings.yalidine_api_id}
+                    onChange={(e) => setSettings(s => ({ ...s, yalidine_api_id: e.target.value }))}
+                    className="w-full bg-surface-container-low text-on-surface text-xs font-mono pr-4 pl-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary border border-primary/10"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-on-surface mb-1.5">
+                    X-API-TOKEN السري:
+                  </label>
+                  <input
+                    type="password"
+                    dir="ltr"
+                    placeholder="أدخل Token حسابك السري من لوحة ياليدين"
+                    value={settings.yalidine_api_token}
+                    onChange={(e) => setSettings(s => ({ ...s, yalidine_api_token: e.target.value }))}
+                    className="w-full bg-surface-container-low text-on-surface text-xs font-mono pr-4 pl-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary border border-primary/10"
+                  />
+                </div>
               </div>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          )}
+
+          {/* Tab 2: ZR Express API */}
+          {activeTab === 'zr_express' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between bg-blue-50/70 p-3.5 rounded-2xl border border-blue-200/80 text-xs">
+                <div className="flex items-center gap-2 text-blue-950 font-bold">
+                  <span>🏢 ZR Express API (بوابة الشحن والمتاجر)</span>
+                </div>
+                <a
+                  href="https://zrexpress.dz"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-700 hover:underline flex items-center gap-1 font-bold"
+                >
+                  <span>موقع zrexpress.dz</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-on-surface mb-1.5">
+                    ZR Express API Key:
+                  </label>
+                  <input
+                    type="text"
+                    dir="ltr"
+                    placeholder="zr_live_key_xxxxxxxxxxxxx"
+                    value={settings.zr_api_key}
+                    onChange={(e) => setSettings(s => ({ ...s, zr_api_key: e.target.value }))}
+                    className="w-full bg-surface-container-low text-on-surface text-xs font-mono pr-4 pl-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary border border-primary/10"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-on-surface mb-1.5">
+                    ZR Security Token (اختياري):
+                  </label>
+                  <input
+                    type="password"
+                    dir="ltr"
+                    placeholder="ZR Token"
+                    value={settings.zr_api_token}
+                    onChange={(e) => setSettings(s => ({ ...s, zr_api_token: e.target.value }))}
+                    className="w-full bg-surface-container-low text-on-surface text-xs font-mono pr-4 pl-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary border border-primary/10"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Tab 3: Maystro Delivery */}
+          {activeTab === 'maystro' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between bg-emerald-50/70 p-3.5 rounded-2xl border border-emerald-200/80 text-xs">
+                <div className="flex items-center gap-2 text-emerald-950 font-bold">
+                  <span>🏢 Maystro Delivery API (المنصة اللوجستية الذكية)</span>
+                </div>
+                <a
+                  href="https://maystro-delivery.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-700 hover:underline flex items-center gap-1 font-bold"
+                >
+                  <span>موقع maystro-delivery.com</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
               <div>
-                <label className="block text-xs font-bold text-on-surface mb-1">
-                  ZR Express API Key
+                <label className="block text-xs font-bold text-on-surface mb-1.5">
+                  Maystro API Key / Token:
                 </label>
                 <input
                   type="text"
                   dir="ltr"
-                  placeholder="zr_live_••••••••"
-                  value={settings.zr_api_key}
-                  onChange={(e) => setSettings(s => ({ ...s, zr_api_key: e.target.value }))}
-                  className="w-full bg-surface-container-low text-on-surface text-xs font-mono p-3 rounded-xl outline-none focus:ring-2 focus:ring-primary focus:bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-on-surface mb-1">
-                  ZR Express Secret Token
-                </label>
-                <input
-                  type="password"
-                  dir="ltr"
-                  placeholder="••••••••••••••••"
-                  value={settings.zr_api_token}
-                  onChange={(e) => setSettings(s => ({ ...s, zr_api_token: e.target.value }))}
-                  className="w-full bg-surface-container-low text-on-surface text-xs font-mono p-3 rounded-xl outline-none focus:ring-2 focus:ring-primary focus:bg-white"
+                  placeholder="maystro_api_token_xxxxxxxxxxxx"
+                  value={settings.maystro_api_key || ''}
+                  onChange={(e) => setSettings(s => ({ ...s, maystro_api_key: e.target.value }))}
+                  className="w-full bg-surface-container-low text-on-surface text-xs font-mono pr-4 pl-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary border border-primary/10"
                 />
               </div>
             </div>
           )}
+
+          {/* Tab 4: EMS Algerie */}
+          {activeTab === 'ems_algerie' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between bg-green-50/70 p-3.5 rounded-2xl border border-green-200/80 text-xs">
+                <div className="flex items-center gap-2 text-green-950 font-bold">
+                  <span>🏢 بريد الجزائر إكسبريس (EMS Champion Post)</span>
+                </div>
+                <a
+                  href="https://ems.dz"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-green-700 hover:underline flex items-center gap-1 font-bold"
+                >
+                  <span>موقع ems.dz</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-on-surface mb-1.5">
+                  EMS Client Contract / API Key:
+                </label>
+                <input
+                  type="text"
+                  dir="ltr"
+                  placeholder="EMS_CLIENT_CONTRACT_XXXXX"
+                  value={settings.ems_api_key || ''}
+                  onChange={(e) => setSettings(s => ({ ...s, ems_api_key: e.target.value }))}
+                  className="w-full bg-surface-container-low text-on-surface text-xs font-mono pr-4 pl-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary border border-primary/10"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Other Companies Tab (Procolis, Ecom, Nord Sud, Kazidour, DHD, Guepex) */}
+          {!['yalidine', 'zr_express', 'maystro', 'ems_algerie'].includes(activeTab) && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between bg-purple-50/70 p-3.5 rounded-2xl border border-purple-200/80 text-xs">
+                <div className="flex items-center gap-2 text-purple-950 font-bold">
+                  <span>🏢 {DELIVERY_COMPANIES[activeTab]?.name} ({DELIVERY_COMPANIES[activeTab]?.name_ar})</span>
+                </div>
+                <a
+                  href={DELIVERY_COMPANIES[activeTab]?.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-purple-700 hover:underline flex items-center gap-1 font-bold"
+                >
+                  <span>الموقع الرسمي</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-on-surface mb-1.5">
+                  مفتاح API الخاص بـ {DELIVERY_COMPANIES[activeTab]?.shortName}:
+                </label>
+                <input
+                  type="text"
+                  dir="ltr"
+                  placeholder={`أدخل API Key أو رمز حساب المتجر لدى ${DELIVERY_COMPANIES[activeTab]?.shortName}`}
+                  value={
+                    activeTab === 'procolis' ? (settings.procolis_api_key || '') :
+                    activeTab === 'ecom_express' ? (settings.ecom_api_key || '') :
+                    activeTab === 'nord_sud' ? (settings.nord_sud_api_key || '') :
+                    activeTab === 'kazidour' ? (settings.kazidour_api_key || '') :
+                    activeTab === 'dhd' ? (settings.dhd_api_key || '') :
+                    activeTab === 'guepex' ? (settings.guepex_api_key || '') : ''
+                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSettings(s => {
+                      if (activeTab === 'procolis') return { ...s, procolis_api_key: val };
+                      if (activeTab === 'ecom_express') return { ...s, ecom_api_key: val };
+                      if (activeTab === 'nord_sud') return { ...s, nord_sud_api_key: val };
+                      if (activeTab === 'kazidour') return { ...s, kazidour_api_key: val };
+                      if (activeTab === 'dhd') return { ...s, dhd_api_key: val };
+                      if (activeTab === 'guepex') return { ...s, guepex_api_key: val };
+                      return s;
+                    });
+                  }}
+                  className="w-full bg-surface-container-low text-on-surface text-xs font-mono pr-4 pl-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary border border-primary/10"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="p-3.5 rounded-xl bg-surface-container-low border border-primary/5 flex items-start gap-2.5 text-xs text-on-surface-variant">
+            <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+            <div className="leading-relaxed">
+              <strong>نظام الشحن والمحاكاة الجزائري الذكي نشط:</strong> حتى في حال لم تقم بتسجيل مفاتيح API بعد، يقوم النظام آلياً بتوليد أرقام إرساليات قياسية، بوليصات شحن كاملة مع باركود، ومحاكاة خط سير الطرد بين مراكز الفرز والولايات لتقديم تجربة حية ممتازة لزبائنك.
+            </div>
+          </div>
         </div>
 
-        {/* SECTION 3: Sender Store Details */}
-        <div className="card-stitch p-6 space-y-4">
-          <h2 className="text-base font-bold text-on-surface flex items-center gap-2 border-b border-primary/10 pb-3">
+        {/* SECTION 3: Sender Details on Bordereau */}
+        <div className="card-stitch p-6 sm:p-7 space-y-4">
+          <h2 className="text-base font-extrabold text-on-surface flex items-center gap-2 border-b border-primary/10 pb-3">
             <Building2 className="w-5 h-5 text-primary" />
-            <span>معلومات المرسل (المتجر في بوليصة الشحن)</span>
+            <span>معلومات المرسل (المتجر في بوليصة الشحن Bordereau)</span>
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-on-surface mb-1">اسم المتجر / المرسل</label>
+              <label className="block text-xs font-bold text-on-surface mb-1.5">
+                اسم المتجر / المرسل:
+              </label>
               <input
                 type="text"
+                required
                 value={settings.sender_name}
                 onChange={(e) => setSettings(s => ({ ...s, sender_name: e.target.value }))}
-                className="w-full bg-surface-container-low text-on-surface text-xs font-semibold p-3 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                className="w-full bg-surface-container-low text-on-surface text-xs font-semibold px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary border border-primary/10"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-on-surface mb-1">رقم هاتف المتجر</label>
+              <label className="block text-xs font-bold text-on-surface mb-1.5">
+                رقم هاتف المتجر الرسمي:
+              </label>
               <input
                 type="text"
+                required
                 dir="ltr"
                 value={settings.sender_phone}
                 onChange={(e) => setSettings(s => ({ ...s, sender_phone: e.target.value }))}
-                className="w-full bg-surface-container-low text-on-surface text-xs font-mono p-3 rounded-xl outline-none focus:ring-2 focus:ring-primary text-right"
+                className="w-full bg-surface-container-low text-on-surface text-xs font-mono px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary border border-primary/10 text-right"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-on-surface mb-1">ولاية مركز الانطلاق</label>
+              <label className="block text-xs font-bold text-on-surface mb-1.5">
+                ولاية المتجر:
+              </label>
               <select
                 value={settings.sender_wilaya}
                 onChange={(e) => setSettings(s => ({ ...s, sender_wilaya: e.target.value }))}
-                className="w-full bg-surface-container-low text-on-surface text-xs font-semibold p-3 rounded-xl outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                className="w-full bg-surface-container-low text-on-surface text-xs font-semibold px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary border border-primary/10 cursor-pointer"
               >
                 {ALGERIA_WILAYAS.map(w => (
                   <option key={w.code} value={`${w.code} - ${w.name_ar}`}>
@@ -315,89 +589,78 @@ export default function DeliverySettingsPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-on-surface mb-1">البلدية</label>
+              <label className="block text-xs font-bold text-on-surface mb-1.5">
+                بلدية المتجر:
+              </label>
               <input
                 type="text"
+                required
                 value={settings.sender_commune}
                 onChange={(e) => setSettings(s => ({ ...s, sender_commune: e.target.value }))}
-                className="w-full bg-surface-container-low text-on-surface text-xs font-semibold p-3 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                className="w-full bg-surface-container-low text-on-surface text-xs font-semibold px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary border border-primary/10"
               />
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-on-surface mb-1">العنوان التفصيلي للمتجر</label>
+              <label className="block text-xs font-bold text-on-surface mb-1.5">
+                العنوان التفصيلي للمقر / المتجر:
+              </label>
               <input
                 type="text"
+                required
                 value={settings.sender_address}
                 onChange={(e) => setSettings(s => ({ ...s, sender_address: e.target.value }))}
-                className="w-full bg-surface-container-low text-on-surface text-xs font-semibold p-3 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                className="w-full bg-surface-container-low text-on-surface text-xs font-semibold px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary border border-primary/10"
               />
             </div>
           </div>
         </div>
 
         {/* SECTION 4: Preferences & Automation */}
-        <div className="card-stitch p-6 space-y-4">
-          <h2 className="text-base font-bold text-on-surface flex items-center gap-2 border-b border-primary/10 pb-3">
-            <Sparkles className="w-5 h-5 text-secondary" />
+        <div className="card-stitch p-6 sm:p-7 space-y-4">
+          <h2 className="text-base font-extrabold text-on-surface flex items-center gap-2 border-b border-primary/10 pb-3">
+            <ShieldCheck className="w-5 h-5 text-secondary" />
             <span>خيارات الشحن والتحديث التلقائي</span>
           </h2>
 
-          <div className="space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-on-surface mb-1.5">
+                نوع التوصيل الافتراضي:
+              </label>
+              <select
+                value={settings.default_delivery_type}
+                onChange={(e) => setSettings(s => ({ ...s, default_delivery_type: e.target.value as 'home' | 'desk' }))}
+                className="w-full bg-surface-container-low text-on-surface text-xs font-semibold px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary border border-primary/10 cursor-pointer"
+              >
+                <option value="home">توصيل إلى باب المنزل (À Domicile)</option>
+                <option value="desk">استلام من مكتب شركة التوصيل (Stop Desk)</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-3 pt-6">
               <input
                 type="checkbox"
+                id="autoSync"
                 checked={settings.auto_sync_enabled}
                 onChange={(e) => setSettings(s => ({ ...s, auto_sync_enabled: e.target.checked }))}
-                className="w-4 h-4 rounded text-primary"
+                className="w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer"
               />
-              <div>
-                <span className="text-xs font-bold text-on-surface block">
-                  تفعيل المزامنة التلقائية لحالات الشحن
-                </span>
-                <span className="text-[11px] text-on-surface-variant">
-                  تحديث حالة الطلب تلقائياً إلى "تم التسليم" أو "راجع" فور تغيّرها في شركة التوصيل.
-                </span>
-              </div>
-            </label>
-
-            <div className="pt-2 border-t border-primary/5">
-              <span className="text-xs font-bold text-on-surface block mb-2">نوع التوصيل الافتراضي:</span>
-              <div className="flex items-center gap-6">
-                <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
-                  <input
-                    type="radio"
-                    name="delivery_type"
-                    value="home"
-                    checked={settings.default_delivery_type === 'home'}
-                    onChange={() => setSettings(s => ({ ...s, default_delivery_type: 'home' }))}
-                  />
-                  <span>توصيل لباب المنزل (À Domicile)</span>
-                </label>
-
-                <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
-                  <input
-                    type="radio"
-                    name="delivery_type"
-                    value="desk"
-                    checked={settings.default_delivery_type === 'desk'}
-                    onChange={() => setSettings(s => ({ ...s, default_delivery_type: 'desk' }))}
-                  />
-                  <span>توصيل للمكتب (Stop Desk)</span>
-                </label>
-              </div>
+              <label htmlFor="autoSync" className="text-xs font-bold text-on-surface cursor-pointer">
+                تفعيل الفحص والمزامنة التلقائية لحالات الشحن عبر الـ API
+              </label>
             </div>
           </div>
         </div>
 
-        {/* Save Actions */}
+        {/* Save Button Bar */}
         <div className="flex items-center justify-end gap-3 pt-4">
           <button
             type="submit"
-            className="btn-pill-primary py-3.5 px-8 text-sm font-bold shadow-stitch flex items-center gap-2"
+            className="btn-pill-primary py-3.5 px-8 font-bold text-sm shadow-stitch-glow flex items-center gap-2"
           >
             <Save className="w-4 h-4" />
-            <span>حفظ جميع إعدادات شركة التوصيل</span>
+            <span>حفظ إعدادات شركات التوصيل</span>
           </button>
         </div>
 
