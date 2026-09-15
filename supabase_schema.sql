@@ -66,52 +66,73 @@ ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow full access on categories" ON public.categories;
+DROP POLICY IF EXISTS "Allow admin all on categories" ON public.categories;
+DROP POLICY IF EXISTS "Allow full access on products" ON public.products;
+DROP POLICY IF EXISTS "Allow admin all on products" ON public.products;
+DROP POLICY IF EXISTS "Allow full access on orders" ON public.orders;
+DROP POLICY IF EXISTS "Allow admin all on orders" ON public.orders;
+DROP POLICY IF EXISTS "Allow public read categories" ON public.categories;
+DROP POLICY IF EXISTS "Allow public read products" ON public.products;
+DROP POLICY IF EXISTS "Allow public insert order" ON public.orders;
+
 -- Categories Policies
-CREATE POLICY "Allow public read categories"
+CREATE POLICY "Public read categories"
     ON public.categories FOR SELECT
     USING (true);
 
-CREATE POLICY "Allow admin all on categories"
+CREATE POLICY "Admin manage categories"
     ON public.categories FOR ALL
     TO authenticated
-    USING (true)
-    WITH CHECK (true);
+    USING ((auth.jwt() ->> 'email') = 'admin@creedperfumes.dz')
+    WITH CHECK ((auth.jwt() ->> 'email') = 'admin@creedperfumes.dz');
 
 -- Products Policies
-CREATE POLICY "Allow public read products"
+CREATE POLICY "Public read products"
     ON public.products FOR SELECT
     USING (true);
 
-CREATE POLICY "Allow admin all on products"
+CREATE POLICY "Admin manage products"
     ON public.products FOR ALL
     TO authenticated
-    USING (true)
-    WITH CHECK (true);
+    USING ((auth.jwt() ->> 'email') = 'admin@creedperfumes.dz')
+    WITH CHECK ((auth.jwt() ->> 'email') = 'admin@creedperfumes.dz');
 
 -- Orders Policies (Customers can create orders without login; Admin can read and update all)
-CREATE POLICY "Allow public insert order"
+CREATE POLICY "Public create orders"
     ON public.orders FOR INSERT
-    WITH CHECK (true);
+    WITH CHECK (
+      char_length(customer_name) BETWEEN 2 AND 120 AND
+      char_length(phone) BETWEEN 8 AND 30 AND
+      char_length(address) BETWEEN 5 AND 500 AND
+      jsonb_typeof(items) = 'array' AND
+      jsonb_array_length(items) BETWEEN 1 AND 50 AND
+      total_price >= 0 AND delivery_fee >= 0
+    );
 
-CREATE POLICY "Allow admin all on orders"
+CREATE POLICY "Admin manage orders"
     ON public.orders FOR ALL
     TO authenticated
-    USING (true)
-    WITH CHECK (true);
+    USING ((auth.jwt() ->> 'email') = 'admin@creedperfumes.dz')
+    WITH CHECK ((auth.jwt() ->> 'email') = 'admin@creedperfumes.dz');
 
 -- 6. Storage Bucket for Perfume Images
 INSERT INTO storage.buckets (id, name, public) 
 VALUES ('perfume-images', 'perfume-images', true)
 ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "Public perfume images access" ON storage.objects;
+DROP POLICY IF EXISTS "Admin perfume images upload" ON storage.objects;
+
 CREATE POLICY "Public perfume images access"
     ON storage.objects FOR SELECT
     USING (bucket_id = 'perfume-images');
 
-CREATE POLICY "Admin perfume images upload"
-    ON storage.objects FOR INSERT
+CREATE POLICY "Admin manage perfume images"
+    ON storage.objects FOR ALL
     TO authenticated
-    WITH CHECK (bucket_id = 'perfume-images');
+    USING (bucket_id = 'perfume-images' AND (auth.jwt() ->> 'email') = 'admin@creedperfumes.dz')
+    WITH CHECK (bucket_id = 'perfume-images' AND (auth.jwt() ->> 'email') = 'admin@creedperfumes.dz');
 
 -- 7. Seed Initial Categories
 INSERT INTO public.categories (id, name, slug, icon) VALUES

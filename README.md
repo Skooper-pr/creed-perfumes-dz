@@ -17,9 +17,7 @@
 
 - **رابط المتجر المباشر على Netlify**: [https://creed-perfumes-dz.netlify.app](https://creed-perfumes-dz.netlify.app)
 - **لوحة تحكم الأدمن**: [https://creed-perfumes-dz.netlify.app/admin](https://creed-perfumes-dz.netlify.app/admin)
-- **بيانات تسجيل دخول الأدمن**:
-  - البريد الإلكتروني: `admin@creedperfumes.dz`
-  - كلمة المرور: `CreedAdmin2025!`
+- **حساب الأدمن**: أنشئ المستخدم `admin@creedperfumes.dz` من Supabase Authentication بكلمة مرور قوية جديدة، ولا تحفظ كلمة المرور في المستودع أو README.
 - **قاعدة البيانات**: متصلة بـ [Supabase](https://supabase.com) سحابياً بنجاح (`eu-central-1`).
 
 ## 🌟 المميزات الرئيسية
@@ -81,7 +79,7 @@
 
 - **رابط اللوحة**: `/admin/login`
 - **البريد الإلكتروني**: `admin@creedperfumes.dz`
-- **حماية تسجيل الدخول**: مشفرة ومؤمنة بنظام التجزئة الآمن SHA-256 + Salt (بدون ظهور أي كلمات مرور في الواجهة أو الكود).
+- **حماية تسجيل الدخول**: Supabase Auth فقط، مع جلسة آمنة وسياسات RLS مقيدة بالبريد المخصص للأدمن.
 
 ---
 
@@ -101,4 +99,4 @@
    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
    ```
-   *ملاحظة: إذا لم تضع المفاتيح، سيعمل الموقع تلقائياً بنظام التخزين المحلي التفاعلي المتكامل.*
+   يجب ضبط هذه المتغيرات في Netlify أيضاً. لا تضع مفتاح `service_role` في الواجهة أو في مستودع Git.
