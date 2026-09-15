@@ -28,8 +28,6 @@ export interface Product {
   fragrance_notes: FragranceNotes;
   concentration?: string; // e.g., 'Eau De Parfum' or 'Extrait de Parfum'
   size?: string; // e.g., '100ml'
-  rating?: number;
-  review_count?: number;
   created_at: string;
 }
 

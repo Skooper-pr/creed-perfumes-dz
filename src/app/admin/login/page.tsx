@@ -82,7 +82,7 @@ export default function AdminLoginPage() {
                   dir="ltr"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@creedperfumes.dz"
+                  placeholder="أدخل بريد الإدارة"
                   className="w-full bg-surface-container-low text-on-surface text-sm pr-11 pl-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all text-right font-mono"
                 />
                 <Mail className="w-4 h-4 text-outline absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />

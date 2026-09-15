@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Sparkles, ShoppingBag, ArrowLeft, Star, ShieldCheck, Truck, Banknote, Clock, Award, CheckCircle } from 'lucide-react';
+import { Sparkles, ShoppingBag, ArrowLeft, ShieldCheck, Truck, Banknote, Clock, Award } from 'lucide-react';
 import { ProductCard } from '@/components/ProductCard';
 import { getProducts, getCategories, subscribeToStoreChanges } from '@/lib/store';
 import { Product, Category } from '@/types';
@@ -118,10 +118,6 @@ export default function HomePage() {
                     alt={featuredProduct?.name || 'Creed Aventus'}
                     className="w-full h-full object-contain drop-shadow-xl hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute -bottom-2 bg-surface-container-lowest px-3.5 py-1 rounded-full shadow-md text-on-surface flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 text-secondary fill-secondary" />
-                    <span className="text-xs font-bold">4.9/5 (1,240 تقييم في الجزائر)</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -286,79 +282,6 @@ export default function HomePage() {
             <span>استعراض كافة العطور وتصفية الأسعار</span>
             <ArrowLeft className="w-4 h-4" />
           </Link>
-        </div>
-      </section>
-
-      {/* SECTION 4: Customer Testimonials / Algerian Reviews */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 w-full">
-        <div className="bg-surface-container-low rounded-3xl p-6 sm:p-10 border border-primary/5">
-          <div className="text-center max-w-xl mx-auto mb-8">
-            <span className="text-xs font-bold text-secondary uppercase tracking-widest">تجارب الزبائن الحقيقية</span>
-            <h3 className="text-2xl sm:text-3xl font-extrabold text-on-surface mt-1">
-              ماذا يقول عملاؤنا في مختلف ولايات الجزائر؟
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
-            <div className="bg-surface-container-lowest p-5 rounded-2xl shadow-stitch flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-1 text-secondary mb-3">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-secondary" />
-                  ))}
-                </div>
-                <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed mb-4">
-                  &quot;عطر Creed Aventus أسطوري بكل معنى الكلمة، وصلني إلى وهران في أقل من 36 ساعة. الدفع كان عند الباب بعد ما شفت الكرتونة وتأكدت منها. شكراً جزيلاً لفريق كريد.&quot;
-                </p>
-              </div>
-              <div className="flex items-center justify-between border-t border-primary/5 pt-3 text-xs">
-                <div className="font-bold text-on-surface">كريم م. — وهران (31)</div>
-                <span className="text-emerald-600 font-semibold flex items-center gap-1">
-                  <CheckCircle className="w-3.5 h-3.5" /> مشتري موثق
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-surface-container-lowest p-5 rounded-2xl shadow-stitch flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-1 text-secondary mb-3">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-secondary" />
-                  ))}
-                </div>
-                <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed mb-4">
-                  &quot;طلبت عطر Wind Flowers لمناسبة خاصة، الرائحة ناعمة وفواحة جداً وثباتها رائع طوال اليوم. تعامل راقٍ ومكالمة تأكيد الطلب كانت سريعة جداً.&quot;
-                </p>
-              </div>
-              <div className="flex items-center justify-between border-t border-primary/5 pt-3 text-xs">
-                <div className="font-bold text-on-surface">سارة ب. — الجزائر العاصمة (16)</div>
-                <span className="text-emerald-600 font-semibold flex items-center gap-1">
-                  <CheckCircle className="w-3.5 h-3.5" /> مشتري موثق
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-surface-container-lowest p-5 rounded-2xl shadow-stitch flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-1 text-secondary mb-3">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-secondary" />
-                  ))}
-                </div>
-                <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed mb-4">
-                  &quot;Silver Mountain Water عطر الانتعاش الحقيقي! وصلني لسطيف مع تغليف محكم جداً. سهولة الطلب بدون تسجيل حساب وبدون كارت هي أفضل ميزة.&quot;
-                </p>
-              </div>
-              <div className="flex items-center justify-between border-t border-primary/5 pt-3 text-xs">
-                <div className="font-bold text-on-surface">رياض ل. — سطيف (19)</div>
-                <span className="text-emerald-600 font-semibold flex items-center gap-1">
-                  <CheckCircle className="w-3.5 h-3.5" /> مشتري موثق
-                </span>
-              </div>
-            </div>
-
-          </div>
         </div>
       </section>
 

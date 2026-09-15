@@ -36,8 +36,6 @@ CREATE TABLE IF NOT EXISTS public.products (
     is_featured BOOLEAN DEFAULT false,
     concentration TEXT DEFAULT 'Eau De Parfum',
     size TEXT DEFAULT '100ml',
-    rating NUMERIC(3, 2) DEFAULT 4.9,
-    review_count INTEGER DEFAULT 1,
     fragrance_notes JSONB DEFAULT '{"top": [], "heart": [], "base": []}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -84,8 +82,8 @@ CREATE POLICY "Public read categories"
 CREATE POLICY "Admin manage categories"
     ON public.categories FOR ALL
     TO authenticated
-    USING ((auth.jwt() ->> 'email') = 'admin@creedperfumes.dz')
-    WITH CHECK ((auth.jwt() ->> 'email') = 'admin@creedperfumes.dz');
+    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
+    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
 
 -- Products Policies
 CREATE POLICY "Public read products"
@@ -95,8 +93,8 @@ CREATE POLICY "Public read products"
 CREATE POLICY "Admin manage products"
     ON public.products FOR ALL
     TO authenticated
-    USING ((auth.jwt() ->> 'email') = 'admin@creedperfumes.dz')
-    WITH CHECK ((auth.jwt() ->> 'email') = 'admin@creedperfumes.dz');
+    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
+    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
 
 -- Orders Policies (Customers can create orders without login; Admin can read and update all)
 CREATE POLICY "Public create orders"
@@ -113,8 +111,8 @@ CREATE POLICY "Public create orders"
 CREATE POLICY "Admin manage orders"
     ON public.orders FOR ALL
     TO authenticated
-    USING ((auth.jwt() ->> 'email') = 'admin@creedperfumes.dz')
-    WITH CHECK ((auth.jwt() ->> 'email') = 'admin@creedperfumes.dz');
+    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
+    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
 
 -- 6. Storage Bucket for Perfume Images
 INSERT INTO storage.buckets (id, name, public) 
@@ -131,8 +129,8 @@ CREATE POLICY "Public perfume images access"
 CREATE POLICY "Admin manage perfume images"
     ON storage.objects FOR ALL
     TO authenticated
-    USING (bucket_id = 'perfume-images' AND (auth.jwt() ->> 'email') = 'admin@creedperfumes.dz')
-    WITH CHECK (bucket_id = 'perfume-images' AND (auth.jwt() ->> 'email') = 'admin@creedperfumes.dz');
+    USING (bucket_id = 'perfume-images' AND auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
+    WITH CHECK (bucket_id = 'perfume-images' AND auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
 
 -- 7. Seed Initial Categories
 INSERT INTO public.categories (id, name, slug, icon) VALUES
@@ -145,7 +143,7 @@ ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug;
 
 -- 8. Seed Initial Iconic Creed Perfumes
 INSERT INTO public.products (
-    id, name, slug, description, price, discount_price, images, category_id, category_name, brand, stock, is_featured, concentration, size, rating, review_count, fragrance_notes
+    id, name, slug, description, price, discount_price, images, category_id, category_name, brand, stock, is_featured, concentration, size, fragrance_notes
 ) VALUES
 (
     'prod-creed-aventus',
@@ -162,7 +160,6 @@ INSERT INTO public.products (
     true,
     'Eau De Parfum',
     '100ml',
-    4.9,
     342,
     '{"top": ["أناناس ملكي", "برغموت إيطالي", "تفاح فرنسي", "كشمش أسود"], "heart": ["أخشاب البتولا المدخنة", "باتشولي نقي", "ياسمين مغربي", "توت العرعر"], "base": ["عنبر الحوت الفاخر", "طحلب السنديان", "فانيليا بوربون", "المسك الأبيض"]}'::jsonb
 ),
@@ -181,7 +178,6 @@ INSERT INTO public.products (
     true,
     'Eau De Parfum',
     '100ml',
-    4.8,
     215,
     '{"top": ["برغموت كالابريا", "يوسفي منعش", "نيرولي"], "heart": ["شاي أخضر نقي", "كشمش أسود جبلي", "أوزون متجمد"], "base": ["مسك ناصع", "خشب الصندل", "بيتي غران", "صمغ راتينجي"]}'::jsonb
 )

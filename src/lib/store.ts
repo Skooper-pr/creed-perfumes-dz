@@ -141,8 +141,6 @@ export async function saveProduct(product: Partial<Product> & { name: string; pr
     is_featured: Boolean(product.is_featured),
     concentration: product.concentration || 'Eau De Parfum',
     size: product.size || '100ml',
-    rating: product.rating ?? 4.9,
-    review_count: product.review_count ?? 1,
     fragrance_notes: product.fragrance_notes || {
       top: ['برغموت', 'فواكه منعشة'],
       heart: ['أزهار نادرة', 'أخشاب ناعمة'],

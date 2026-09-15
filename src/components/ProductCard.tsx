@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ShoppingBag, Star, Sparkles, Check } from 'lucide-react';
+import { ShoppingBag, Sparkles, Check } from 'lucide-react';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
 
@@ -52,10 +52,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </span>
         )}
 
-        <div className="flex items-center gap-1 text-[11px] font-bold text-on-surface-variant bg-surface-container-low px-2 py-0.5 rounded-full">
-          <Star className="w-3 h-3 text-secondary fill-secondary" />
-          <span>{product.rating || 4.9}</span>
-        </div>
       </div>
 
       {/* Bottle Image with Radial Stage */}

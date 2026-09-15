@@ -27,8 +27,6 @@ export const INITIAL_PRODUCTS: Product[] = [
     is_featured: true,
     concentration: 'Eau De Parfum',
     size: '100ml',
-    rating: 4.9,
-    review_count: 342,
     fragrance_notes: {
       top: ['أناناس ملكي', 'برغموت إيطالي', 'تفاح فرنسي', 'كشمش أسود'],
       heart: ['أخشاب البتولا المدخنة', 'باتشولي نقي', 'ياسمين مغربي', 'توت العرعر'],
@@ -54,8 +52,6 @@ export const INITIAL_PRODUCTS: Product[] = [
     is_featured: true,
     concentration: 'Eau De Parfum',
     size: '100ml',
-    rating: 4.8,
-    review_count: 215,
     fragrance_notes: {
       top: ['برغموت كالابريا', 'يوسفي منعش', 'نيرولي'],
       heart: ['شاي أخضر نقي', 'كشمش أسود جبلي', 'أوزون متجمد'],
@@ -80,8 +76,6 @@ export const INITIAL_PRODUCTS: Product[] = [
     is_featured: false,
     concentration: 'Eau De Parfum',
     size: '100ml',
-    rating: 4.9,
-    review_count: 180,
     fragrance_notes: {
       top: ['ليمون صقلي منعش', 'رعي الحمام الليموني', 'نعناع بري'],
       heart: ['أوراق البنفسج الخضراء الندية', 'سوسن نبيل'],
@@ -106,8 +100,6 @@ export const INITIAL_PRODUCTS: Product[] = [
     is_featured: true,
     concentration: 'Eau De Parfum',
     size: '100ml',
-    rating: 4.7,
-    review_count: 164,
     fragrance_notes: {
       top: ['فواكه حمضية مشمسة', 'ملح بحري نقي'],
       heart: ['ليمون صقلي مبهج', 'برغموت', 'سوسن فلورنسي', 'يوسفي'],
@@ -133,8 +125,6 @@ export const INITIAL_PRODUCTS: Product[] = [
     is_featured: true,
     concentration: 'Eau De Parfum',
     size: '75ml',
-    rating: 4.9,
-    review_count: 145,
     fragrance_notes: {
       top: ['زهر البرتقال التونسي', 'خوخ مخملي حلو', 'ياسمين هندي نقي'],
       heart: ['ياسمين سامباك', 'ورد سنتيفوليا', 'مسك الروم الأبيض'],
@@ -159,8 +149,6 @@ export const INITIAL_PRODUCTS: Product[] = [
     is_featured: false,
     concentration: 'Eau De Parfum',
     size: '75ml',
-    rating: 4.9,
-    review_count: 98,
     fragrance_notes: {
       top: ['كرز أسود غني', 'زعفران أحمر نادر', 'فلفل وردي مدغشقري'],
       heart: ['ورد دي ماي الفاخر', 'بنفسج بري', 'خشب الكشمير الأنيق'],
@@ -185,8 +173,6 @@ export const INITIAL_PRODUCTS: Product[] = [
     is_featured: true,
     concentration: 'Eau De Parfum',
     size: '100ml',
-    rating: 5.0,
-    review_count: 112,
     fragrance_notes: {
       top: ['ليمون كالابريا', 'فلفل وردي حار', 'برغموت صقلي'],
       heart: ['خشب الأرز العطري', 'حشيشة الملاك', 'كرفس بري نبيل'],
@@ -211,8 +197,6 @@ export const INITIAL_PRODUCTS: Product[] = [
     is_featured: false,
     concentration: 'Eau De Parfum',
     size: '75ml',
-    rating: 4.8,
-    review_count: 129,
     fragrance_notes: {
       top: ['تفاح أخضر مقرمش', 'برغموت منعش', 'أوراق البنفسج', 'فلفل وردي'],
       heart: ['ورد دمشقي ندي', 'خشب الصندل', 'ستيراكس صمغي'],

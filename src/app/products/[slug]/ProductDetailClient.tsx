@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { 
   ShoppingBag, 
   Sparkles, 
-  Star, 
   ShieldCheck, 
   Truck, 
   Clock, 
@@ -166,15 +165,10 @@ export default function ProductDetailClient() {
         <div className="lg:col-span-6 flex flex-col gap-6">
           
           <div>
-            <div className="flex items-center justify-between gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-bold text-secondary uppercase tracking-wider">
                 {product.brand} • {product.concentration || 'Eau De Parfum'}
               </span>
-              <div className="flex items-center gap-1 text-xs font-bold text-on-surface bg-surface-container px-2.5 py-1 rounded-full">
-                <Star className="w-3.5 h-3.5 text-secondary fill-secondary" />
-                <span>{product.rating || 4.9}</span>
-                <span className="text-on-surface-variant font-normal">({product.review_count || 120} تقييم)</span>
-              </div>
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight">

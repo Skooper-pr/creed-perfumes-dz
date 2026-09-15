@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingBag, Search, Menu, X, Shield, PhoneCall, Sparkles } from 'lucide-react';
+import { ShoppingBag, Search, Menu, X, PhoneCall, Sparkles } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 
 export const Header: React.FC = () => {
@@ -109,15 +109,6 @@ export const Header: React.FC = () => {
               )}
             </Link>
 
-            {/* Admin Portal Quick Link */}
-            <Link
-              href="/admin/login"
-              title="دخول المسؤول"
-              className="hidden sm:flex items-center justify-center w-11 h-11 rounded-full bg-surface-container-low hover:bg-primary/10 text-on-surface-variant hover:text-primary transition-all duration-200"
-            >
-              <Shield className="w-4 h-4" />
-            </Link>
-
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -160,14 +151,6 @@ export const Header: React.FC = () => {
                   <span>{link.label}</span>
                 </Link>
               ))}
-              <Link
-                href="/admin/login"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-4 py-3 rounded-xl text-sm font-semibold text-primary-container bg-primary/5 flex items-center gap-2"
-              >
-                <Shield className="w-4 h-4" />
-                <span>لوحة تحكم المسؤول (الأدمن)</span>
-              </Link>
             </nav>
           </div>
         )}

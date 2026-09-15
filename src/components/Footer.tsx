@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Truck, ShieldCheck, Banknote, Phone, Instagram, Send, ArrowUpRight } from 'lucide-react';
+import { Truck, ShieldCheck, Banknote, Phone, Instagram, Send } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   const pathname = usePathname();
@@ -109,7 +109,7 @@ export const Footer: React.FC = () => {
             </div>
           </div>
 
-          {/* Col 4: Contact & Admin */}
+          {/* Col 4: Contact */}
           <div>
             <h4 className="font-bold text-sm text-on-surface mb-4">التواصل والمساعدة</h4>
             <div className="space-y-2 text-sm text-on-surface-variant">
@@ -140,15 +140,6 @@ export const Footer: React.FC = () => {
                 </a>
               </div>
 
-              <div className="pt-3">
-                <Link
-                  href="/admin/login"
-                  className="inline-flex items-center gap-1.5 text-xs text-primary font-bold bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-full transition-colors"
-                >
-                  <span>بوابة صاحب المتجر (Admin)</span>
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
             </div>
           </div>
 
