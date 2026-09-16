@@ -1,15 +1,12 @@
 import { Order, OrderStatus } from '@/types';
 
-const DEFAULT_BOT_TOKEN = '8842449617:AAE7fhWMSyN-5GtoeTiPj1SZQ-Tz6GrZhiA';
-const DEFAULT_ADMIN_IDS = ['7239883874'];
-
 export function getTelegramBotToken(): string {
-  return process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
+  return process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || '';
 }
 
 export function getTelegramAdminChatIds(): string[] {
   const envVal = process.env.NEXT_PUBLIC_TELEGRAM_ADMIN_CHAT_IDS;
-  if (!envVal) return DEFAULT_ADMIN_IDS;
+  if (!envVal) return [];
   return envVal
     .split(',')
     .map((id) => id.trim())

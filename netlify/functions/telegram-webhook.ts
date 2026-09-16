@@ -1,14 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
-const BOT_TOKEN = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || '8842449617:AAE7fhWMSyN-5GtoeTiPj1SZQ-Tz6GrZhiA';
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || '';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://hkdyuasngmyzrhydariq.supabase.co';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrZHl1YXNuZ215enJoeWRhcmlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNjk5OTQsImV4cCI6MjEwNDk0NTk5NH0.quOfiPh96n8nNT7bnO32tQZtZvMQZGvRuKDIOpn7nNU';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function getAuthorizedAdminIds(): string[] {
-  const envVal = process.env.NEXT_PUBLIC_TELEGRAM_ADMIN_CHAT_IDS;
-  if (!envVal) return ['7239883874'];
+  const envVal = process.env.TELEGRAM_ADMIN_CHAT_IDS || process.env.NEXT_PUBLIC_TELEGRAM_ADMIN_CHAT_IDS;
+  if (!envVal) return [];
   return envVal
     .split(',')
     .map((id) => id.trim())
@@ -90,22 +90,41 @@ export const handler = async (event: { httpMethod: string; body?: string | null 
         }
 
         // Update database in Supabase via RPC (bypasses RLS securely using bot secret)
-        const { error: rpcError } = await supabase.rpc('update_order_status_via_bot', {
+        const secret = BOT_TOKEN || process.env.TELEGRAM_SECURITY_SECRET || 'creed_dz_bot_sec';
+        const { data: rpcData, error: rpcError } = await supabase.rpc('update_order_status_via_bot', {
           p_order_id: orderId,
           p_status: newStatus,
-          p_secret: BOT_TOKEN,
+          p_secret: secret,
         });
 
-        if (rpcError) {
+        let updateSucceeded = !rpcError && (rpcData as { success?: boolean })?.success !== false;
+
+        if (!updateSucceeded) {
+          console.warn('RPC update_order_status_via_bot failed, trying direct update:', rpcError || rpcData);
           // Fallback direct update
           const shouldDeduct = ['confirmed', 'shipped', 'delivered'].includes(newStatus);
-          await supabase
+          const { error: directErr } = await supabase
             .from('orders')
             .update({
               status: newStatus,
               stock_deducted: shouldDeduct,
             })
             .or(`id.eq.${orderId},order_number.eq.${orderId}`);
+
+          if (!directErr) {
+            updateSucceeded = true;
+          } else {
+            console.error('Direct fallback update also failed:', directErr);
+          }
+        }
+
+        if (!updateSucceeded) {
+          await callTelegram('answerCallbackQuery', {
+            callback_query_id: cq.id,
+            text: '⚠️ تعذر تحديث حالة الطلبية في قاعدة البيانات. يرجى مراجعة الخادم.',
+            show_alert: true,
+          });
+          return { statusCode: 200, body: JSON.stringify({ ok: false, error: 'Database update failed' }) };
         }
 
         const adminName = cq.from?.first_name || cq.from?.username || 'المدير';
