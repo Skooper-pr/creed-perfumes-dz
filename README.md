@@ -15,8 +15,8 @@
 
 ## 🚀 النشر الحي وقاعدة البيانات (Live Deployment)
 
-- **رابط المتجر المباشر على Netlify**: [https://creed-perfumes-dz.netlify.app](https://creed-perfumes-dz.netlify.app)
-- **لوحة تحكم الأدمن**: [https://creed-perfumes-dz.netlify.app/admin](https://creed-perfumes-dz.netlify.app/admin)
+- **رابط المتجر المباشر على Netlify**: [https://creedperfumes.netlify.app](https://creedperfumes.netlify.app)
+- **لوحة تحكم الأدمن**: [https://creedperfumes.netlify.app/admin](https://creedperfumes.netlify.app/admin)
 - **حساب الأدمن**: يُنشأ ويُدار حصرياً من Supabase Authentication، ولا تُعرض بياناته في المتجر أو المستودع.
 - **قاعدة البيانات**: متصلة بـ [Supabase](https://supabase.com) سحابياً بنجاح (`eu-central-1`).
 

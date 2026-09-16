@@ -20,6 +20,7 @@ import { getProductBySlug, getProducts, subscribeToStoreChanges } from '@/lib/st
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { ProductCard } from '@/components/ProductCard';
+import { Loader } from '@/components/Loader';
 
 export default function ProductDetailClient() {
   const params = useParams();
@@ -31,6 +32,7 @@ export default function ProductDetailClient() {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [isJustAdded, setIsJustAdded] = useState(false);
 
   const { addItem } = useCart();
 
@@ -57,9 +59,12 @@ export default function ProductDetailClient() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-20 text-center">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-sm font-semibold text-on-surface-variant">جاري تحميل تفاصيل العطر...</p>
+      <div className="max-w-7xl mx-auto px-4 py-24 flex items-center justify-center">
+        <Loader
+          text="جاري تحميل تفاصيل العطر الملكي..."
+          subtext="خدمة التوصيل متوفرة لجميع الـ 58 ولاية جزائرية مع الدفع عند الاستلام (COD)"
+          size={1}
+        />
       </div>
     );
   }
@@ -87,6 +92,8 @@ export default function ProductDetailClient() {
   const handleAddToCart = () => {
     if (isOutOfStock) return;
     addItem(product, quantity);
+    setIsJustAdded(true);
+    setTimeout(() => setIsJustAdded(false), 800);
   };
 
   const handleDirectBuy = () => {
@@ -112,9 +119,9 @@ export default function ProductDetailClient() {
         
         {/* RIGHT COLUMN in RTL: Image Gallery (6 Columns) */}
         <div className="lg:col-span-6 flex flex-col gap-4">
-          <div className="aspect-square rounded-3xl bg-gradient-to-tr from-surface-container-high/60 via-surface-container-low to-surface-container-lowest p-6 sm:p-10 flex items-center justify-center relative overflow-hidden shadow-stitch border border-primary/5">
-            <div className="absolute w-64 h-64 rounded-full bg-primary/10 blur-2xl pointer-events-none" />
-            <div className="absolute -bottom-10 -right-10 w-48 h-48 rounded-full bg-secondary/15 blur-2xl pointer-events-none" />
+          <div className="aspect-square rounded-3xl bg-gradient-to-tr from-surface-container-high/60 via-surface-container-low to-surface-container-lowest p-6 sm:p-10 flex flex-col items-center justify-center relative overflow-hidden shadow-stitch border border-primary/5 group shimmer-container">
+            <div className="absolute w-72 h-72 rounded-full bg-primary/20 blur-3xl animate-aura-pulse pointer-events-none" />
+            <div className="absolute -bottom-10 -right-10 w-56 h-56 rounded-full bg-secondary/20 blur-3xl animate-float-slow pointer-events-none" />
 
             <div className="absolute top-4 right-4 z-10 flex flex-col gap-1.5">
               {isOutOfStock ? (
@@ -123,13 +130,13 @@ export default function ProductDetailClient() {
                   <span>نفذت الكمية</span>
                 </span>
               ) : hasDiscount ? (
-                <span className="bg-secondary text-white text-xs font-black px-3 py-1 rounded-full shadow-sm">
+                <span className="bg-secondary text-white text-xs font-black px-3 py-1 rounded-full shadow-sm animate-pulse-glow">
                   وفر {discountPercent}%
                 </span>
               ) : null}
               {product.is_featured && !isOutOfStock && (
                 <span className="bg-primary text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
-                  <Sparkles className="w-3.5 h-3.5 text-secondary" />
+                  <Sparkles className="w-3.5 h-3.5 text-secondary animate-pulse" />
                   <span>عطر مميز</span>
                 </span>
               )}
@@ -138,8 +145,11 @@ export default function ProductDetailClient() {
             <img
               src={product.images[selectedImageIndex] || product.images[0]}
               alt={product.name}
-              className="w-full h-full object-contain drop-shadow-2xl z-10 transition-all duration-300 hover:scale-105"
+              className="w-full h-full object-contain drop-shadow-2xl z-10 animate-float-slow group-hover:scale-105 transition-all duration-500"
             />
+
+            {/* Synchronized dynamic shadow beneath bottle */}
+            <div className="absolute bottom-6 w-44 h-4 rounded-full bg-primary/25 blur-md animate-shadow-scale pointer-events-none" />
           </div>
 
           {product.images.length > 1 && (
@@ -148,9 +158,9 @@ export default function ProductDetailClient() {
                 <button
                   key={idx}
                   onClick={() => setSelectedImageIndex(idx)}
-                  className={`w-20 h-20 rounded-2xl p-2 bg-surface-container-low border-2 transition-all flex items-center justify-center shrink-0 ${
+                  className={`w-20 h-20 rounded-2xl p-2 bg-surface-container-low border-2 transition-all flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 ${
                     selectedImageIndex === idx
-                      ? 'border-primary shadow-sm'
+                      ? 'border-primary shadow-stitch-glow scale-105'
                       : 'border-transparent hover:border-primary/30'
                   }`}
                 >
@@ -290,44 +300,61 @@ export default function ProductDetailClient() {
             <div className="space-y-4 pt-2">
               <div className="flex items-center gap-4">
                 <span className="text-xs font-bold text-on-surface">الكمية:</span>
-                <div className="flex items-center bg-surface-container rounded-full p-1 border border-primary/10">
+                <div className="flex items-center bg-surface-container rounded-full p-1 border border-primary/10 shadow-inner">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-on-surface hover:text-primary transition-colors shadow-sm"
+                    className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-on-surface hover:text-primary hover:scale-110 active:scale-75 transition-all duration-200 shadow-sm"
                     aria-label="إنقاص الكمية"
                   >
                     <Minus className="w-3.5 h-3.5" />
                   </button>
-                  <span className="w-10 text-center text-sm font-black text-on-surface">
+                  <span className="w-10 text-center text-sm font-black text-on-surface select-none">
                     {quantity}
                   </span>
                   <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-on-surface hover:text-primary transition-colors shadow-sm"
+                    onClick={() => setQuantity(Math.min(product.stock ?? 10, quantity + 1))}
+                    disabled={quantity >= (product.stock ?? 10)}
+                    className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-on-surface hover:text-primary hover:scale-110 active:scale-75 transition-all duration-200 shadow-sm disabled:opacity-35 disabled:cursor-not-allowed"
                     aria-label="زيادة الكمية"
                   >
                     <Plus className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <span className="text-xs text-on-surface-variant">
+                <span className="text-xs text-on-surface-variant font-bold">
                   الإجمالي: {(activePrice * quantity).toLocaleString('ar-DZ')} دج
+                  {product.stock && quantity >= product.stock && (
+                    <span className="text-[10px] text-amber-700 block mt-0.5">
+                      (الحد الأقصى المتوفر: {product.stock} قطع)
+                    </span>
+                  )}
                 </span>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <button
                   onClick={handleDirectBuy}
-                  className="btn-pill-secondary flex-1 text-sm py-4 shadow-stitch-coral"
+                  className="btn-pill-secondary flex-1 text-sm py-4 shadow-stitch-coral shimmer-container hover:scale-[1.02] active:scale-95 group transition-all duration-300"
                 >
-                  <ShoppingBag className="w-4 h-4" />
+                  <ShoppingBag className="w-4 h-4 group-hover:scale-115 transition-transform" />
                   <span>اطلب الآن مباشرة (الدفع عند الاستلام)</span>
                 </button>
 
                 <button
                   onClick={handleAddToCart}
-                  className="btn-pill-primary flex-1 text-sm py-4 shadow-stitch-glow"
+                  className={`btn-pill flex-1 text-sm py-4 transition-all duration-300 active:scale-95 ${
+                    isJustAdded
+                      ? 'bg-emerald-600 text-white shadow-emerald-500/40 animate-badge-pop'
+                      : 'btn-pill-primary shadow-stitch-glow hover:scale-[1.02]'
+                  }`}
                 >
-                  <span>أضف إلى سلة المشتريات</span>
+                  {isJustAdded ? (
+                    <>
+                      <Check className="w-5 h-5 animate-badge-pop" />
+                      <span>تمت الإضافة بنجاح!</span>
+                    </>
+                  ) : (
+                    <span>أضف إلى سلة المشتريات</span>
+                  )}
                 </button>
               </div>
             </div>

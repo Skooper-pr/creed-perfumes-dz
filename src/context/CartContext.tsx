@@ -60,16 +60,23 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const hideToast = () => setToastMessage(null);
 
   const addItem = (product: Product, quantity = 1) => {
+    const maxStock = Math.max(0, product.stock ?? 10);
+    if (maxStock <= 0) {
+      showToast(`عذراً، نفذت كمية "${product.name}" من المخزون حالياً.`);
+      return;
+    }
+
     setItems(prevItems => {
       const existing = prevItems.find(item => item.product.id === product.id);
       if (existing) {
+        const newQty = Math.min(maxStock, existing.quantity + quantity);
         return prevItems.map(item =>
           item.product.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
+            ? { ...item, quantity: newQty }
             : item
         );
       }
-      return [...prevItems, { product, quantity }];
+      return [...prevItems, { product, quantity: Math.min(maxStock, quantity) }];
     });
 
     const activePrice = product.discount_price ?? product.price;
@@ -86,9 +93,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     setItems(prev =>
-      prev.map(item =>
-        item.product.id === productId ? { ...item, quantity } : item
-      )
+      prev.map(item => {
+        if (item.product.id === productId) {
+          const maxStock = Math.max(1, item.product.stock ?? 10);
+          const clamped = Math.min(maxStock, quantity);
+          return { ...item, quantity: clamped };
+        }
+        return item;
+      })
     );
   };
 

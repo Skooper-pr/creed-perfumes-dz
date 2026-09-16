@@ -227,10 +227,51 @@ export function saveDeliverySettings(settings: DeliverySettings): void {
   } catch (e) {
     console.error('Failed to save delivery settings:', e);
   }
+
+  // Also sync to Supabase admin_settings if configured and admin is logged in
+  if (isSupabaseConfigured() && supabase) {
+    Promise.resolve(
+      supabase
+        .from('admin_settings')
+        .upsert({
+          key: 'delivery_settings',
+          value: settings,
+          updated_at: new Date().toISOString(),
+        })
+    )
+      .then(({ error }) => {
+        if (error) console.warn('Supabase admin_settings sync warning:', error);
+      })
+      .catch((err: unknown) => console.warn('Supabase delivery settings sync error:', err));
+  }
+}
+
+export async function fetchDeliverySettingsFromCloud(): Promise<DeliverySettings> {
+  const local = getDeliverySettings();
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('admin_settings')
+        .select('value')
+        .eq('key', 'delivery_settings')
+        .single();
+      if (!error && data && data.value) {
+        const merged = { ...local, ...data.value };
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(DELIVERY_SETTINGS_KEY, JSON.stringify(merged));
+        }
+        return merged;
+      }
+    } catch (e) {
+      console.warn('Cloud delivery settings fetch error:', e);
+    }
+  }
+  return local;
 }
 
 export interface DispatchResult {
   success: boolean;
+  is_simulated?: boolean;
   tracking_number?: string;
   tracking_url?: string;
   label_url?: string;
@@ -304,6 +345,7 @@ export async function dispatchOrderToDelivery(
 
           return {
             success: true,
+            is_simulated: false,
             tracking_number: trackingNumber,
             tracking_url: trackingUrl,
             label_url: labelUrl,
@@ -317,7 +359,7 @@ export async function dispatchOrderToDelivery(
     }
   }
 
-  // 2. Smart Algerian Delivery Engine for all 10 companies
+  // 2. Smart Algerian Delivery Engine for all 10 companies (Simulation)
   const randomSuffix = Math.floor(100000 + Math.random() * 900000);
   const wilayaCodeClean = order.wilaya_code || '16';
   
@@ -331,7 +373,7 @@ export async function dispatchOrderToDelivery(
   }
 
   const trackingUrl = company.trackingUrl(trackingNumber);
-  const rawStatus = `تم تسجيل الشحنة لدى ${company.name_ar} (مركز الفرز الرئيسي)`;
+  const rawStatus = `تم تسجيل الشحنة لدى ${company.name_ar} (محاكاة)`;
 
   const result = {
     tracking_number: trackingNumber,
@@ -348,6 +390,7 @@ export async function dispatchOrderToDelivery(
 
   return {
     success: true,
+    is_simulated: true,
     tracking_number: trackingNumber,
     tracking_url: trackingUrl,
     provider,
@@ -472,6 +515,19 @@ async function updateOrderWithDeliveryInfo(
 }
 
 /**
+ * HTML sanitization helper to prevent Stored XSS
+ */
+function escapeHtml(str: unknown): string {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
  * Generates an official printable shipping label / bordereau for any of the 10 companies
  */
 export function openPrintableShippingLabel(order: Order): void {
@@ -488,11 +544,26 @@ export function openPrintableShippingLabel(order: Order): void {
     return;
   }
 
+  const safeCustomerName = escapeHtml(order.customer_name);
+  const safePhone = escapeHtml(order.phone);
+  const safePhoneSecondary = escapeHtml(order.phone_secondary);
+  const safeWilaya = escapeHtml(order.wilaya);
+  const safeCommune = escapeHtml(order.commune);
+  const safeAddress = escapeHtml(order.address);
+  const safeNotes = escapeHtml(order.notes);
+  const safeOrderNumber = escapeHtml(order.order_number);
+  const safeTrackingNumber = escapeHtml(trackingNumber);
+  const safeSenderName = escapeHtml(settings.sender_name);
+  const safeSenderPhone = escapeHtml(settings.sender_phone);
+  const safeSenderWilaya = escapeHtml(settings.sender_wilaya);
+  const safeSenderCommune = escapeHtml(settings.sender_commune);
+  const safeSenderAddress = escapeHtml(settings.sender_address);
+
   const itemsHtml = (order.items || [])
     .map(i => `<tr>
-      <td style="padding: 6px 10px; border-bottom: 1px solid #eee;">${i.name}</td>
-      <td style="padding: 6px 10px; border-bottom: 1px solid #eee; text-align: center;">${i.qty}</td>
-      <td style="padding: 6px 10px; border-bottom: 1px solid #eee; text-align: left;">${i.price.toLocaleString('ar-DZ')} دج</td>
+      <td style="padding: 6px 10px; border-bottom: 1px solid #eee;">${escapeHtml(i.name)}</td>
+      <td style="padding: 6px 10px; border-bottom: 1px solid #eee; text-align: center;">${Number(i.qty) || 1}</td>
+      <td style="padding: 6px 10px; border-bottom: 1px solid #eee; text-align: left;">${(Number(i.price) || 0).toLocaleString('ar-DZ')} دج</td>
     </tr>`)
     .join('');
 
@@ -501,7 +572,7 @@ export function openPrintableShippingLabel(order: Order): void {
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>بوليصة شحن - ${order.order_number} - ${trackingNumber}</title>
+  <title>بوليصة شحن - ${safeOrderNumber} - ${safeTrackingNumber}</title>
   <style>
     body {
       font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
@@ -596,36 +667,36 @@ export function openPrintableShippingLabel(order: Order): void {
         <span style="font-size: 12px; color: #666;">دار العطور الملكية • شحنة فاخرة</span>
       </div>
       <div style="text-align: left;">
-        <span style="display: block; font-weight: bold; font-size: 16px; color: ${company.themeColor};">${company.name} (${company.name_ar})</span>
-        <span style="font-size: 11px; color: #888;">Livraison Express 58 Wilayas • ${company.coverage}</span>
+        <span style="display: block; font-weight: bold; font-size: 16px; color: ${company.themeColor};">${escapeHtml(company.name)} (${escapeHtml(company.name_ar)})</span>
+        <span style="font-size: 11px; color: #888;">Livraison Express 58 Wilayas • ${escapeHtml(company.coverage)}</span>
       </div>
     </div>
 
     <div class="barcode">
       |||| | |||||| || |||||| | ||||<br>
-      ${trackingNumber}
+      ${safeTrackingNumber}
     </div>
 
     <div class="grid">
       <div class="card">
         <strong style="font-size: 12px; color: #541f91; display: block; margin-bottom: 6px;">المرسل (Expéditeur):</strong>
         <div style="font-size: 12px; line-height: 1.6;">
-          <strong>${settings.sender_name}</strong><br>
-          ${settings.sender_phone}<br>
-          ${settings.sender_wilaya} — ${settings.sender_commune}<br>
-          ${settings.sender_address}
+          <strong>${safeSenderName}</strong><br>
+          ${safeSenderPhone}<br>
+          ${safeSenderWilaya} — ${safeSenderCommune}<br>
+          ${safeSenderAddress}
         </div>
       </div>
 
       <div class="card" style="border: 2px solid ${company.themeColor};">
         <strong style="font-size: 12px; color: ${company.themeColor}; display: block; margin-bottom: 6px;">المرسل إليه (Destinataire):</strong>
         <div style="font-size: 13px; line-height: 1.6;">
-          <strong style="font-size: 15px;">${order.customer_name}</strong><br>
-          <span style="font-weight: bold; color: #000; font-size: 14px;">📞 ${order.phone}</span>
-          ${order.phone_secondary ? ` | ${order.phone_secondary}` : ''}<br>
-          <strong>الولاية: ${order.wilaya}</strong><br>
-          البلدية: ${order.commune}<br>
-          العنوان: ${order.address}
+          <strong style="font-size: 15px;">${safeCustomerName}</strong><br>
+          <span style="font-weight: bold; color: #000; font-size: 14px;">📞 ${safePhone}</span>
+          ${safePhoneSecondary ? ` | ${safePhoneSecondary}` : ''}<br>
+          <strong>الولاية: ${safeWilaya}</strong><br>
+          البلدية: ${safeCommune}<br>
+          العنوان: ${safeAddress}
         </div>
       </div>
     </div>
@@ -651,18 +722,18 @@ export function openPrintableShippingLabel(order: Order): void {
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
       <span class="fragile">⚠️ عطور زجاجية فاخرة — قابل للكسر (Fragile)</span>
-      <span style="font-size: 11px; color: #666;">رقم الطلب الداخلي: ${order.order_number}</span>
+      <span style="font-size: 11px; color: #666;">رقم الطلب الداخلي: ${safeOrderNumber}</span>
     </div>
 
     ${order.notes ? `
     <div style="margin-top: 10px; background: #fffbe6; border: 1px solid #ffe58f; padding: 8px 12px; border-radius: 8px; font-size: 11px;">
-      <strong>ملاحظات الزبون:</strong> ${order.notes}
+      <strong>ملاحظات الزبون:</strong> ${safeNotes}
     </div>` : ''}
   </div>
 
   <div class="no-print">
     <button onclick="window.print()" style="background: ${company.themeColor}; color: white; border: none; padding: 12px 28px; font-size: 14px; font-weight: bold; border-radius: 50px; cursor: pointer;">
-      🖨️ طباعة بوليصة الشحن (${company.shortName})
+      🖨️ طباعة بوليصة الشحن (${escapeHtml(company.shortName)})
     </button>
   </div>
 

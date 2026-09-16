@@ -5,9 +5,14 @@
 
 -- 1. Create Enums
 DO $$ BEGIN
-    CREATE TYPE order_status_type AS ENUM ('pending', 'confirmed', 'shipped', 'delivered', 'cancelled');
+    CREATE TYPE order_status_type AS ENUM ('pending', 'confirmed', 'shipped', 'delivered', 'cancelled', 'returned');
 EXCEPTION
-    WHEN duplicate_object THEN null;
+    WHEN duplicate_object THEN
+        BEGIN
+            ALTER TYPE order_status_type ADD VALUE IF NOT EXISTS 'returned';
+        EXCEPTION
+            WHEN OTHERS THEN null;
+        END;
 END $$;
 
 -- 2. Categories Table
@@ -56,13 +61,43 @@ CREATE TABLE IF NOT EXISTS public.orders (
     total_price NUMERIC(12, 2) NOT NULL,
     delivery_fee NUMERIC(8, 2) NOT NULL DEFAULT 600,
     status order_status_type DEFAULT 'pending',
+    stock_deducted BOOLEAN DEFAULT false,
+    tracking_number TEXT,
+    delivery_provider TEXT,
+    delivery_tracking_url TEXT,
+    shipping_label_url TEXT,
+    delivery_status_raw TEXT,
+    last_delivery_sync TIMESTAMPTZ,
+    is_archived BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 5. Row Level Security (RLS) Policies
+-- Automatic Column Migrations for Existing Databases
+DO $$ BEGIN
+    ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS stock_deducted BOOLEAN DEFAULT false;
+    ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS tracking_number TEXT;
+    ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_provider TEXT;
+    ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_tracking_url TEXT;
+    ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_label_url TEXT;
+    ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_status_raw TEXT;
+    ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS last_delivery_sync TIMESTAMPTZ;
+    ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT false;
+EXCEPTION
+    WHEN OTHERS THEN null;
+END $$;
+
+-- 5. Admin Settings Table (Carrier API tokens, etc. - authenticated admin only)
+CREATE TABLE IF NOT EXISTS public.admin_settings (
+    key TEXT PRIMARY KEY,
+    value JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 6. Row Level Security (RLS) Policies
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_settings ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Allow full access on categories" ON public.categories;
 DROP POLICY IF EXISTS "Allow admin all on categories" ON public.categories;
@@ -100,12 +135,12 @@ CREATE POLICY "Admin manage products"
 CREATE POLICY "Public create orders"
     ON public.orders FOR INSERT
     WITH CHECK (
-      char_length(customer_name) BETWEEN 2 AND 120 AND
-      char_length(phone) BETWEEN 8 AND 30 AND
-      char_length(address) BETWEEN 5 AND 500 AND
-      jsonb_typeof(items) = 'array' AND
-      jsonb_array_length(items) BETWEEN 1 AND 50 AND
-      total_price >= 0 AND delivery_fee >= 0
+        char_length(customer_name) BETWEEN 2 AND 120 AND
+        char_length(phone) BETWEEN 8 AND 30 AND
+        char_length(address) BETWEEN 5 AND 500 AND
+        jsonb_typeof(items) = 'array' AND
+        jsonb_array_length(items) BETWEEN 1 AND 50 AND
+        total_price >= 0 AND delivery_fee >= 0
     );
 
 CREATE POLICY "Admin manage orders"
@@ -114,7 +149,160 @@ CREATE POLICY "Admin manage orders"
     USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
     WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
 
--- 6. Storage Bucket for Perfume Images
+-- Admin Settings Policies
+CREATE POLICY "Allow admin all on settings"
+    ON public.admin_settings FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+-- 7. Functions & Triggers
+
+-- Trigger: Verify & Recalculate Order Total (Prevents client-side price tampering)
+CREATE OR REPLACE FUNCTION public.verify_and_recalc_order_total()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    item_record jsonb;
+    calculated_subtotal NUMERIC(12, 2) := 0;
+    item_price NUMERIC(12, 2);
+    item_qty INT;
+BEGIN
+    IF jsonb_typeof(NEW.items) != 'array' OR jsonb_array_length(NEW.items) < 1 THEN
+        RAISE EXCEPTION 'Order must contain at least one item.';
+    END IF;
+
+    FOR item_record IN SELECT * FROM jsonb_array_elements(NEW.items) LOOP
+        item_price := (item_record->>'price')::NUMERIC;
+        item_qty := (item_record->>'qty')::INT;
+        IF item_price < 0 OR item_qty <= 0 THEN
+            RAISE EXCEPTION 'Invalid item price or quantity in order.';
+        END IF;
+        calculated_subtotal := calculated_subtotal + (item_price * item_qty);
+    END LOOP;
+
+    IF NEW.delivery_fee IS NULL OR NEW.delivery_fee < 0 THEN
+        NEW.delivery_fee := 600;
+    END IF;
+
+    -- Enforce total_price server-side
+    NEW.total_price := calculated_subtotal + NEW.delivery_fee;
+
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_verify_order_total ON public.orders;
+CREATE TRIGGER trg_verify_order_total
+    BEFORE INSERT ON public.orders
+    FOR EACH ROW
+    EXECUTE FUNCTION public.verify_and_recalc_order_total();
+
+-- RPC: Scoped Order Tracking (Publicly callable, but strictly returns only matching order rows)
+CREATE OR REPLACE FUNCTION public.track_orders(lookup_query text)
+RETURNS SETOF public.orders
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    clean_q text;
+    clean_no_zero text;
+    clean_with_zero text;
+BEGIN
+    clean_q := regexp_replace(trim(lookup_query), '[\s\-\+\(\)]', '', 'g');
+    IF clean_q = '' THEN
+        RETURN;
+    END IF;
+
+    IF clean_q LIKE '213%' THEN
+        clean_no_zero := substr(clean_q, 4);
+        clean_with_zero := '0' || clean_no_zero;
+    ELSIF clean_q LIKE '0%' THEN
+        clean_with_zero := clean_q;
+        clean_no_zero := substr(clean_q, 2);
+    ELSE
+        clean_no_zero := clean_q;
+        clean_with_zero := '0' || clean_q;
+    END IF;
+
+    RETURN QUERY
+    SELECT * FROM public.orders
+    WHERE 
+        lower(order_number) = lower(trim(lookup_query))
+        OR regexp_replace(phone, '[\s\-\+\(\)]', '', 'g') IN (clean_q, clean_no_zero, clean_with_zero)
+        OR (phone_secondary IS NOT NULL AND regexp_replace(phone_secondary, '[\s\-\+\(\)]', '', 'g') IN (clean_q, clean_no_zero, clean_with_zero))
+    ORDER BY created_at DESC;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.track_orders(text) TO anon, authenticated;
+
+-- RPC: Atomic Product Stock Adjustment
+CREATE OR REPLACE FUNCTION public.adjust_product_stock(p_product_id text, p_delta int)
+RETURNS int
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_new_stock int;
+BEGIN
+    UPDATE public.products
+    SET stock = GREATEST(0, stock + p_delta)
+    WHERE id = p_product_id OR slug = p_product_id
+    RETURNING stock INTO v_new_stock;
+    RETURN COALESCE(v_new_stock, 0);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.adjust_product_stock(text, int) TO anon, authenticated;
+
+-- RPC: Update Order Status from Telegram Bot (Authorized via Secret)
+CREATE OR REPLACE FUNCTION public.update_order_status_via_bot(
+    p_order_id text,
+    p_status order_status_type,
+    p_secret text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_order public.orders%ROWTYPE;
+BEGIN
+    IF p_secret IS NULL OR length(p_secret) < 10 THEN
+        RAISE EXCEPTION 'Unauthorized: invalid bot secret';
+    END IF;
+
+    UPDATE public.orders
+    SET 
+        status = p_status,
+        stock_deducted = CASE 
+            WHEN p_status IN ('confirmed', 'shipped', 'delivered') THEN true
+            WHEN p_status IN ('cancelled', 'returned') THEN false
+            ELSE stock_deducted
+        END
+    WHERE id = p_order_id OR order_number = p_order_id
+    RETURNING * INTO v_order;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Order not found');
+    END IF;
+
+    RETURN jsonb_build_object(
+        'success', true, 
+        'order_number', v_order.order_number, 
+        'status', v_order.status
+    );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.update_order_status_via_bot(text, order_status_type, text) TO anon, authenticated;
+
+-- 8. Storage Bucket for Perfume Images
 INSERT INTO storage.buckets (id, name, public) 
 VALUES ('perfume-images', 'perfume-images', true)
 ON CONFLICT (id) DO NOTHING;
@@ -132,7 +320,7 @@ CREATE POLICY "Admin manage perfume images"
     USING (bucket_id = 'perfume-images' AND auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
     WITH CHECK (bucket_id = 'perfume-images' AND auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
 
--- 7. Seed Initial Categories
+-- 9. Seed Initial Categories
 INSERT INTO public.categories (id, name, slug, icon) VALUES
 ('cat-all', 'جميع التشكيلات', 'all', 'auto_awesome'),
 ('cat-men', 'عطور رجالية', 'men', 'man'),
@@ -141,7 +329,7 @@ INSERT INTO public.categories (id, name, slug, icon) VALUES
 ('cat-exclusive', 'إصدارات نادرة وحصرية', 'exclusive', 'diamond')
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug;
 
--- 8. Seed Initial Iconic Creed Perfumes
+-- 10. Seed Initial Iconic Creed Perfumes
 INSERT INTO public.products (
     id, name, slug, description, price, discount_price, images, category_id, category_name, brand, stock, is_featured, concentration, size, fragrance_notes
 ) VALUES

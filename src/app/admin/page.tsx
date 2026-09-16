@@ -16,6 +16,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { getOrders, getProducts } from '@/lib/store';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { Order, Product } from '@/types';
 
 export default function AdminDashboardPage() {
@@ -50,11 +51,11 @@ export default function AdminDashboardPage() {
   );
 
   const totalMonthlySales = confirmedOrDelivered.reduce(
-    (acc, o) => acc + o.total_price,
+    (acc, o) => acc + (Number(o.total_price) || 0),
     0
   );
 
-  const lowStockProducts = products.filter((p) => p.stock < 10);
+  const lowStockProducts = products.filter((p) => (p.stock ?? 0) <= 5);
   const totalStockCount = products.reduce((acc, p) => acc + p.stock, 0);
 
   const recentOrders = orders.slice(0, 6);
@@ -65,11 +66,25 @@ export default function AdminDashboardPage() {
     shipped: { label: 'قيد الشحن', color: 'bg-blue-100 text-blue-800' },
     delivered: { label: 'تم التسليم بنجاح', color: 'bg-emerald-100 text-emerald-800' },
     cancelled: { label: 'ملغى', color: 'bg-neutral-100 text-neutral-600' },
+    returned: { label: 'طرد مسترجع', color: 'bg-amber-100 text-amber-800' },
   };
 
   return (
     <div className="space-y-8">
       
+      {/* Offline Database Warning Banner */}
+      {!isSupabaseConfigured() && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex items-start gap-3 text-amber-900 text-xs shadow-sm">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <strong className="block font-bold text-sm">تنبيه: المتجر يعمل حالياً بالوضع التجريبي المحلي (غير متصل بـ Supabase)</strong>
+            <p>
+              أي تعديلات على العطور أو الطلبيات سيتم حفظها محلياً فقط في هذا المتصفح. تأكد من ضبط <code>NEXT_PUBLIC_SUPABASE_URL</code> و <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> في إعدادات Netlify للربط الفعلي.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Top Banner / Welcome Strip */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

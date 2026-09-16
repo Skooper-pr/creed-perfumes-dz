@@ -33,23 +33,28 @@ export const MobileBottomNav: React.FC = () => {
             <Link
               key={item.href}
               href={item.href}
-              className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-full transition-all min-w-[64px] ${
+              className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition-all duration-300 min-w-[64px] active:scale-90 ${
                 isActive
                   ? 'text-primary font-bold'
                   : 'text-on-surface-variant hover:text-primary'
               }`}
             >
               <div className="relative">
-                <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+                <Icon className={`w-5 h-5 transition-all duration-300 ${isActive ? 'scale-115 stroke-[2.5px] text-primary' : 'stroke-2'}`} />
                 {Boolean(item.badge && item.badge > 0) && (
-                  <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] bg-secondary text-white text-[10px] font-black rounded-full flex items-center justify-center px-1">
+                  <span
+                    key={item.badge}
+                    className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] bg-secondary text-white text-[10px] font-black rounded-full flex items-center justify-center px-1 shadow-stitch-coral animate-badge-pop"
+                  >
                     {item.badge}
                   </span>
                 )}
               </div>
-              <span className="text-[11px] mt-0.5">{item.label}</span>
+              <span className={`text-[11px] mt-0.5 transition-all duration-300 ${isActive ? 'font-black scale-105' : ''}`}>
+                {item.label}
+              </span>
               {isActive && (
-                <span className="w-1.5 h-1.5 rounded-full bg-primary mt-0.5" />
+                <span className="w-1.5 h-1.5 rounded-full bg-primary mt-0.5 animate-pulse shadow-stitch-glow" />
               )}
             </Link>
           );

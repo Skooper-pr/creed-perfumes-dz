@@ -65,6 +65,57 @@ const config: Config = {
         full: "9999px",
         "4xl": "2rem",
       },
+      keyframes: {
+        float: {
+          "0%, 100%": { transform: "translateY(0px) rotate(0deg)" },
+          "50%": { transform: "translateY(-12px) rotate(1deg)" },
+        },
+        "float-reverse": {
+          "0%, 100%": { transform: "translateY(0px) rotate(0deg)" },
+          "50%": { transform: "translateY(10px) rotate(-1deg)" },
+        },
+        "float-slow": {
+          "0%, 100%": { transform: "translateY(0px) scale(1)" },
+          "50%": { transform: "translateY(-8px) scale(1.02)" },
+        },
+        "shadow-scale": {
+          "0%, 100%": { transform: "scale(1)", opacity: "0.2" },
+          "50%": { transform: "scale(0.82)", opacity: "0.1" },
+        },
+        "aura-pulse": {
+          "0%, 100%": { transform: "scale(1)", opacity: "0.2" },
+          "50%": { transform: "scale(1.2)", opacity: "0.38" },
+        },
+        "badge-pop": {
+          "0%": { transform: "scale(0.85)" },
+          "45%": { transform: "scale(1.28)" },
+          "70%": { transform: "scale(0.95)" },
+          "100%": { transform: "scale(1)" },
+        },
+        shimmer: {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(200%)" },
+        },
+        "pulse-glow": {
+          "0%, 100%": { opacity: "0.7", transform: "scale(1)" },
+          "50%": { opacity: "1", transform: "scale(1.05)" },
+        },
+        "fade-up": {
+          "0%": { opacity: "0", transform: "translateY(16px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        float: "float 5s ease-in-out infinite",
+        "float-reverse": "float-reverse 6s ease-in-out infinite",
+        "float-slow": "float-slow 6s ease-in-out infinite",
+        "shadow-scale": "shadow-scale 5s ease-in-out infinite",
+        "aura-pulse": "aura-pulse 4s ease-in-out infinite",
+        "badge-pop": "badge-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+        shimmer: "shimmer 2.5s infinite",
+        "pulse-glow": "pulse-glow 2.5s ease-in-out infinite",
+        "fade-up": "fade-up 0.5s ease-out forwards",
+      },
     },
   },
   plugins: [],

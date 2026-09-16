@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import { ProductCard } from '@/components/ProductCard';
+import { Loader } from '@/components/Loader';
 import { getProducts, getCategories, subscribeToStoreChanges } from '@/lib/store';
 import { Product, Category } from '@/types';
 
@@ -121,7 +122,7 @@ function ProductsContent() {
           <div className="relative flex-1 md:w-48">
             <select
               value={sortBy}
-              onChange={(e: any) => setSortBy(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSortBy(e.target.value as 'featured' | 'price-asc' | 'price-desc')}
               className="w-full appearance-none bg-surface-container-low text-on-surface text-xs sm:text-sm font-semibold pr-8 pl-8 py-3 rounded-full cursor-pointer outline-none focus:ring-2 focus:ring-primary/20"
             >
               <option value="featured">الأكثر تميزاً وشهرة</option>
@@ -165,7 +166,15 @@ function ProductsContent() {
       </div>
 
       {/* Products Grid */}
-      {filteredProducts.length > 0 ? (
+      {loading ? (
+        <div className="py-16 flex items-center justify-center">
+          <Loader
+            text="جاري تحميل تشكيلة عطور دار Creed الملكية..."
+            subtext="شحن سريع لجميع الـ 58 ولاية جزائرية مع الدفع عند الاستلام"
+            size={1}
+          />
+        </div>
+      ) : filteredProducts.length > 0 ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {filteredProducts.map((product) => (
             <ProductCard key={product.id} product={product} />
@@ -199,9 +208,12 @@ function ProductsContent() {
 export default function ProductsPage() {
   return (
     <Suspense fallback={
-      <div className="max-w-7xl mx-auto px-4 py-20 text-center">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-xs font-semibold text-on-surface-variant">جاري تحميل تشكيلة العطور...</p>
+      <div className="max-w-7xl mx-auto px-4 py-24 flex items-center justify-center">
+        <Loader
+          text="جاري تحميل تشكيلة العطور..."
+          subtext="خدمة التوصيل والدفع عند الاستلام (COD)"
+          size={1}
+        />
       </div>
     }>
       <ProductsContent />

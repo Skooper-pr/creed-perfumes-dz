@@ -110,9 +110,10 @@ export default function CheckoutPage() {
 
       // Redirect to Order Confirmed page
       router.push(`/order-confirmed?orderId=${newOrder.id}&orderNumber=${newOrder.order_number}`);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
-      setErrorMsg('حدث خطأ أثناء حفظ الطلبية، يرجى المحاولة مرة أخرى.');
+      const message = err instanceof Error ? err.message : 'حدث خطأ أثناء حفظ الطلبية، يرجى المحاولة مرة أخرى.';
+      setErrorMsg(message);
       setIsSubmitting(false);
     }
   };

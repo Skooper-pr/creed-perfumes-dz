@@ -1,6 +1,7 @@
 import { Product, Category, Order, OrderStatus } from '@/types';
 import { INITIAL_PRODUCTS, INITIAL_CATEGORIES, INITIAL_ORDERS } from '@/data/initialData';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { sendTelegramOrderNotification } from './telegram';
 
 const PRODUCTS_KEY = 'creed_perfumes_products';
 const CATEGORIES_KEY = 'creed_perfumes_categories';
@@ -150,27 +151,29 @@ export async function saveProduct(product: Partial<Product> & { name: string; pr
   };
 
   if (isSupabaseConfigured() && supabase) {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .upsert(fullProduct)
-        .select()
-        .single();
-      if (!error && data) {
-        // Synchronize local cache
-        const prods = getLocal<Product[]>(PRODUCTS_KEY, INITIAL_PRODUCTS);
-        const idx = prods.findIndex(p => p.id === data.id);
-        if (idx >= 0) prods[idx] = data as Product;
-        else prods.unshift(data as Product);
-        setLocal(PRODUCTS_KEY, prods);
-        notifyDataChanged();
-        return data as Product;
-      }
-    } catch (e) {
-      console.warn('Falling back to local storage:', e);
+    const { data, error } = await supabase
+      .from('products')
+      .upsert(fullProduct)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Supabase saveProduct error:', error);
+      throw new Error(`تعذر حفظ العطر في قاعدة البيانات: ${error.message}`);
+    }
+
+    if (data) {
+      const prods = getLocal<Product[]>(PRODUCTS_KEY, INITIAL_PRODUCTS);
+      const idx = prods.findIndex(p => p.id === data.id);
+      if (idx >= 0) prods[idx] = data as Product;
+      else prods.unshift(data as Product);
+      setLocal(PRODUCTS_KEY, prods);
+      notifyDataChanged();
+      return data as Product;
     }
   }
 
+  // Offline fallback
   const products = getLocal<Product[]>(PRODUCTS_KEY, INITIAL_PRODUCTS);
   const existingIdx = products.findIndex(p => p.id === fullProduct.id);
   if (existingIdx >= 0) {
@@ -185,11 +188,10 @@ export async function saveProduct(product: Partial<Product> & { name: string; pr
 
 export async function deleteProduct(id: string): Promise<boolean> {
   if (isSupabaseConfigured() && supabase) {
-    try {
-      const { error } = await supabase.from('products').delete().eq('id', id);
-      if (error) console.error('Supabase delete error:', error);
-    } catch (e) {
-      console.warn('Falling back to local storage:', e);
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) {
+      console.error('Supabase delete error:', error);
+      throw new Error(`تعذر حذف العطر من قاعدة البيانات: ${error.message}`);
     }
   }
 
@@ -225,17 +227,17 @@ export async function saveCategory(category: { name: string; slug?: string; icon
   };
 
   if (isSupabaseConfigured() && supabase) {
-    try {
-      const { data, error } = await supabase.from('categories').insert(newCat).select().single();
-      if (!error && data) {
-        const cats = getLocal<Category[]>(CATEGORIES_KEY, INITIAL_CATEGORIES);
-        cats.push(data as Category);
-        setLocal(CATEGORIES_KEY, cats);
-        notifyDataChanged();
-        return data as Category;
-      }
-    } catch (e) {
-      console.warn('Falling back to local categories:', e);
+    const { data, error } = await supabase.from('categories').insert(newCat).select().single();
+    if (error) {
+      console.error('Supabase saveCategory error:', error);
+      throw new Error(`تعذر حفظ الفئة: ${error.message}`);
+    }
+    if (data) {
+      const cats = getLocal<Category[]>(CATEGORIES_KEY, INITIAL_CATEGORIES);
+      cats.push(data as Category);
+      setLocal(CATEGORIES_KEY, cats);
+      notifyDataChanged();
+      return data as Category;
     }
   }
 
@@ -248,10 +250,10 @@ export async function saveCategory(category: { name: string; slug?: string; icon
 
 export async function deleteCategory(id: string): Promise<boolean> {
   if (isSupabaseConfigured() && supabase) {
-    try {
-      await supabase.from('categories').delete().eq('id', id);
-    } catch (e) {
-      console.warn(e);
+    const { error } = await supabase.from('categories').delete().eq('id', id);
+    if (error) {
+      console.error('Supabase deleteCategory error:', error);
+      throw new Error(`تعذر حذف الفئة: ${error.message}`);
     }
   }
   const cats = getLocal<Category[]>(CATEGORIES_KEY, INITIAL_CATEGORIES);
@@ -262,6 +264,30 @@ export async function deleteCategory(id: string): Promise<boolean> {
 
 // -------------------- STOCK MANAGEMENT --------------------
 export async function adjustProductStock(productIdOrSlug: string, delta: number): Promise<void> {
+  // First try atomic RPC on Supabase
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      const { data, error } = await supabase.rpc('adjust_product_stock', {
+        p_product_id: productIdOrSlug,
+        p_delta: delta,
+      });
+
+      if (!error && typeof data === 'number') {
+        const localProducts = getLocal<Product[]>(PRODUCTS_KEY, INITIAL_PRODUCTS);
+        const idx = localProducts.findIndex(p => p.id === productIdOrSlug || p.slug === productIdOrSlug);
+        if (idx >= 0) {
+          localProducts[idx].stock = data;
+          setLocal(PRODUCTS_KEY, localProducts);
+        }
+        notifyDataChanged();
+        return;
+      }
+    } catch (e) {
+      console.warn('adjust_product_stock RPC error, trying direct update:', e);
+    }
+  }
+
+  // Fallback direct read-then-write
   const products = await getProducts();
   const product = products.find(p => p.id === productIdOrSlug || p.slug === productIdOrSlug);
   if (!product) return;
@@ -288,77 +314,15 @@ export async function adjustProductStock(productIdOrSlug: string, delta: number)
     localProducts[idx].stock = newStock;
     setLocal(PRODUCTS_KEY, localProducts);
   }
+  notifyDataChanged();
 }
 
 // -------------------- ORDERS --------------------
-const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
 
 /**
- * Automatically purge delivered, cancelled, and stale pending orders (> 48h without progress)
- * Ensures they are completely removed from Supabase and local store.
+ * Returns all active and historical orders.
+ * Orders are preserved for full lifetime history, analytics, dispute resolution, and export.
  */
-export async function purgeStaleAndCompletedOrders(rawOrders: Order[]): Promise<Order[]> {
-  const now = Date.now();
-  const toPurge: Order[] = [];
-  const keepOrders: Order[] = [];
-
-  for (const order of rawOrders) {
-    let shouldPurge = false;
-
-    // Rule 1: Delivered orders -> purge immediately
-    if (order.status === 'delivered') {
-      shouldPurge = true;
-    }
-    // Rule 2: Cancelled orders -> purge immediately
-    else if (order.status === 'cancelled') {
-      shouldPurge = true;
-    }
-    // Rule 3: Pending orders with no progress for > 48 hours -> purge immediately
-    else if (order.status === 'pending') {
-      const orderDate = new Date(order.created_at).getTime();
-      if (!isNaN(orderDate) && (now - orderDate) > FORTY_EIGHT_HOURS_MS) {
-        shouldPurge = true;
-      }
-    }
-
-    if (shouldPurge) {
-      toPurge.push(order);
-    } else {
-      keepOrders.push(order);
-    }
-  }
-
-  if (toPurge.length > 0) {
-    // Restore stock if any cancelled/stale order had stock deducted
-    for (const order of toPurge) {
-      if (order.stock_deducted && order.status !== 'delivered') {
-        if (order.items && order.items.length > 0) {
-          for (const item of order.items) {
-            await adjustProductStock(item.product_id, Number(item.qty || 1));
-          }
-        }
-      }
-    }
-
-    // Delete purged orders from Supabase
-    if (isSupabaseConfigured() && supabase) {
-      try {
-        const ids = toPurge.map(p => p.id);
-        const { error } = await supabase.from('orders').delete().in('id', ids);
-        if (error) console.error('Supabase orders purge error:', error);
-      } catch (e) {
-        console.warn('Error purging orders from Supabase:', e);
-      }
-    }
-
-    // Update local cache with kept orders only
-    setLocal(ORDERS_KEY, keepOrders);
-    notifyDataChanged();
-  }
-
-  return keepOrders;
-}
-
 export async function getOrders(): Promise<Order[]> {
   let fetchedOrders: Order[] = [];
 
@@ -371,21 +335,25 @@ export async function getOrders(): Promise<Order[]> {
 
       if (!error && data) {
         fetchedOrders = data as Order[];
+        setLocal(ORDERS_KEY, fetchedOrders);
+        return fetchedOrders;
+      }
+      if (error) {
+        console.warn('Supabase getOrders error:', error);
       }
     } catch (e) {
       console.warn('Falling back to local orders:', e);
     }
   }
 
-  if (fetchedOrders.length === 0) {
-    fetchedOrders = getLocal<Order[]>(ORDERS_KEY, INITIAL_ORDERS);
-  }
-
-  // Automatically purge delivered, cancelled, or >48h stale pending orders
-  const activeOrders = await purgeStaleAndCompletedOrders(fetchedOrders);
-  return activeOrders;
+  return getLocal<Order[]>(ORDERS_KEY, INITIAL_ORDERS);
 }
 
+/**
+ * Creates a new order.
+ * CRITICAL FIX (P0-1): Strictly throws if Supabase write fails when Supabase is configured.
+ * Does NOT silently swallow errors or fake success in the customer's browser.
+ */
 export async function createOrder(orderData: Omit<Order, 'id' | 'order_number' | 'created_at' | 'status'>): Promise<Order> {
   const randomNum = Math.floor(10000 + Math.random() * 90000);
   const orderNumber = `DZ-${randomNum}`;
@@ -399,24 +367,49 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'order_number' |
   };
 
   if (isSupabaseConfigured() && supabase) {
-    try {
-      const { data, error } = await supabase.from('orders').insert(newOrder).select().single();
-      if (!error && data) {
-        const orders = getLocal<Order[]>(ORDERS_KEY, INITIAL_ORDERS);
-        orders.unshift(data as Order);
-        setLocal(ORDERS_KEY, orders);
-        notifyDataChanged();
-        return data as Order;
-      }
-    } catch (e) {
-      console.warn('Falling back to local storage for order creation:', e);
+    const { data, error } = await supabase.from('orders').insert(newOrder).select().single();
+    if (error) {
+      console.error('Supabase createOrder error:', error);
+      throw new Error(`تعذر حفظ الطلبية في الخادم: ${error.message || 'يرجى التحقق من الاتصال بالإنترنت'}`);
     }
+    if (data) {
+      const savedOrder = data as Order;
+      const orders = getLocal<Order[]>(ORDERS_KEY, INITIAL_ORDERS);
+      orders.unshift(savedOrder);
+      setLocal(ORDERS_KEY, orders);
+      notifyDataChanged();
+
+      // Send Telegram notification to all configured admins
+      try {
+        await Promise.race([
+          sendTelegramOrderNotification(savedOrder),
+          new Promise((resolve) => setTimeout(resolve, 1500)),
+        ]);
+      } catch (err) {
+        console.warn('Telegram order notification failed:', err);
+      }
+
+      return savedOrder;
+    }
+    throw new Error('لم يتم استلام تأكيد حفظ الطلبية من الخادم.');
   }
 
+  // Offline demo fallback only
   const orders = getLocal<Order[]>(ORDERS_KEY, INITIAL_ORDERS);
   orders.unshift(newOrder);
   setLocal(ORDERS_KEY, orders);
   notifyDataChanged();
+
+  // Send Telegram notification for demo mode as well
+  try {
+    await Promise.race([
+      sendTelegramOrderNotification(newOrder),
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]);
+  } catch (err) {
+    console.warn('Telegram order notification failed:', err);
+  }
+
   return newOrder;
 }
 
@@ -435,11 +428,10 @@ export async function deleteOrder(orderId: string): Promise<boolean> {
   }
 
   if (isSupabaseConfigured() && supabase) {
-    try {
-      const { error } = await supabase.from('orders').delete().eq('id', order.id);
-      if (error) console.error('Supabase deleteOrder error:', error);
-    } catch (e) {
-      console.warn('Error deleting order from Supabase:', e);
+    const { error } = await supabase.from('orders').delete().eq('id', order.id);
+    if (error) {
+      console.error('Supabase deleteOrder error:', error);
+      throw new Error(`تعذر حذف الطلبية من الخادم: ${error.message}`);
     }
   }
 
@@ -450,69 +442,70 @@ export async function deleteOrder(orderId: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Updates order status with full support for:
+ * - 'pending'
+ * - 'confirmed'
+ * - 'shipped'
+ * - 'delivered' (Preserves order in history! Never hard-deletes)
+ * - 'cancelled' (Restores stock if deducted, preserves in history)
+ * - 'returned' (P0-5 fix: supported in app & database)
+ */
 export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<boolean> {
   const orders = await getOrders();
   const order = orders.find(o => o.id === orderId || o.order_number === orderId);
   if (!order) return false;
 
   const wasDeducted = Boolean(order.stock_deducted);
+  let newStockDeducted = wasDeducted;
 
-  // Case A: Order is delivered -> ensure stock is deducted, then delete immediately from the site
   if (status === 'delivered') {
+    // Ensure stock is deducted upon delivery
     if (!wasDeducted && order.items && order.items.length > 0) {
       for (const item of order.items) {
         await adjustProductStock(item.product_id, -Number(item.qty || 1));
       }
     }
-    // Delete immediately from site as per requirements
-    await deleteOrder(order.id);
-    return true;
-  }
-
-  // Case B: Order is cancelled -> restore stock if deducted, then delete immediately from the site
-  if (status === 'cancelled') {
+    newStockDeducted = true;
+  } else if (status === 'cancelled') {
+    // Restore stock if it was previously deducted
     if (wasDeducted && order.items && order.items.length > 0) {
       for (const item of order.items) {
         await adjustProductStock(item.product_id, Number(item.qty || 1));
       }
     }
-    // Delete immediately from site as per requirements
-    await deleteOrder(order.id);
-    return true;
-  }
-
-  // Case C: Active statuses ('confirmed', 'shipped', 'pending', 'returned')
-  const shouldDeduct = ['confirmed', 'shipped'].includes(status);
-  const shouldRestore = ['pending', 'returned'].includes(status);
-
-  let newStockDeducted = wasDeducted;
-
-  if (shouldDeduct && !wasDeducted) {
-    if (order.items && order.items.length > 0) {
-      for (const item of order.items) {
-        await adjustProductStock(item.product_id, -Number(item.qty || 1));
-      }
-    }
-    newStockDeducted = true;
-  } else if (shouldRestore && wasDeducted) {
-    if (order.items && order.items.length > 0) {
-      for (const item of order.items) {
-        await adjustProductStock(item.product_id, Number(item.qty || 1));
-      }
-    }
     newStockDeducted = false;
+  } else {
+    const shouldDeduct = ['confirmed', 'shipped'].includes(status);
+    const shouldRestore = ['pending', 'returned'].includes(status);
+
+    if (shouldDeduct && !wasDeducted) {
+      if (order.items && order.items.length > 0) {
+        for (const item of order.items) {
+          await adjustProductStock(item.product_id, -Number(item.qty || 1));
+        }
+      }
+      newStockDeducted = true;
+    } else if (shouldRestore && wasDeducted) {
+      if (order.items && order.items.length > 0) {
+        for (const item of order.items) {
+          await adjustProductStock(item.product_id, Number(item.qty || 1));
+        }
+      }
+      newStockDeducted = false;
+    }
   }
 
   // Update in Supabase
   if (isSupabaseConfigured() && supabase) {
-    try {
-      const { error } = await supabase
-        .from('orders')
-        .update({ status, stock_deducted: newStockDeducted })
-        .eq('id', order.id);
-      if (error) console.error('Supabase order update error:', error);
-    } catch (e) {
-      console.warn('Falling back to local update:', e);
+    const { error } = await supabase
+      .from('orders')
+      .update({ status, stock_deducted: newStockDeducted })
+      .eq('id', order.id);
+
+    if (error) {
+      console.error('Supabase order update error:', error);
+      throw new Error(`فشل تحديث حالة الطلبية: ${error.message}`);
     }
   }
 
@@ -529,10 +522,30 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus): P
   return true;
 }
 
+/**
+ * Searches orders by phone number or order number.
+ * CRITICAL FIX (P0-4): Calls secure PostgreSQL RPC `track_orders` when online,
+ * preventing data breaches while enabling reliable tracking for real customers.
+ */
 export async function getOrdersByPhone(query: string): Promise<Order[]> {
   const clean = query.trim().replace(/[\s\-\+\(\)]/g, '');
   if (!clean) return [];
 
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      const { data, error } = await supabase.rpc('track_orders', { lookup_query: query.trim() });
+      if (!error && Array.isArray(data)) {
+        return data as Order[];
+      }
+      if (error) {
+        console.warn('Supabase track_orders RPC error, checking local:', error);
+      }
+    } catch (e) {
+      console.warn('Supabase tracking lookup error:', e);
+    }
+  }
+
+  // Offline demo fallback
   const stripped213 = clean.startsWith('213') ? '0' + clean.slice(3) : clean;
   const strippedZero = clean.startsWith('0') ? clean.slice(1) : clean;
 

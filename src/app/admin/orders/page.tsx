@@ -71,8 +71,12 @@ export default function AdminOrdersPage() {
       const res = await dispatchOrderToDelivery(order, customProvider);
       if (res.success) {
         const compName = DELIVERY_COMPANIES[res.provider]?.name_ar || res.provider;
-        setStatusNotice(`تم إرسال الطلبية بنجاح إلى شركة التوصيل (${compName})! رقم التتبع: ${res.tracking_number}`);
-        setTimeout(() => setStatusNotice(null), 6000);
+        if (res.is_simulated) {
+          setStatusNotice(`⚠️ تم إنشاء شحنة تجريبية (محاكاة - بدون ربط API رسمي) مع ${compName}. كود التتبع: ${res.tracking_number}`);
+        } else {
+          setStatusNotice(`✅ تم إرسال الطلبية بنجاح عبر API شركة التوصيل الرسمية (${compName})! رقم التتبع: ${res.tracking_number}`);
+        }
+        setTimeout(() => setStatusNotice(null), 8000);
         await loadOrders();
         if (activeOrder && activeOrder.id === order.id) {
           setActiveOrder((prev) => prev ? {

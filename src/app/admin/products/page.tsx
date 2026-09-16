@@ -52,6 +52,21 @@ export default function AdminProductsPage() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Validate mime type
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      alert('صيغة الملف غير مدعومة. يرجى اختيار صورة بصيغة JPG أو PNG أو WEBP.');
+      return;
+    }
+
+    // Validate size (max 5 MB)
+    const MAX_SIZE_BYTES = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE_BYTES) {
+      alert('حجم الصورة كبير جداً (أكثر من 5 ميغابايت). يرجى اختيار صورة أصغر حجماً لتسريع تحميل المتجر.');
+      return;
+    }
+
     setUploadingImage(true);
     try {
       const publicUrl = await uploadPerfumeImage(file);

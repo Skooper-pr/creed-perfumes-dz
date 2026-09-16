@@ -120,20 +120,21 @@ export default function CartPage() {
 
                 {/* Quantity & Actions */}
                 <div className="flex items-center justify-between sm:justify-end gap-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-primary/5">
-                  <div className="flex items-center bg-surface-container rounded-full p-1 border border-primary/10">
+                  <div className="flex items-center bg-surface-container rounded-full p-1 border border-primary/10 shadow-inner">
                     <button
                       onClick={() => updateQuantity(product.id, quantity - 1)}
-                      className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-on-surface hover:text-primary shadow-sm"
+                      className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-on-surface hover:text-primary shadow-sm hover:scale-110 active:scale-75 transition-all duration-200"
                       aria-label="تقليل الكمية"
                     >
                       <Minus className="w-3 h-3" />
                     </button>
-                    <span className="w-8 text-center text-xs font-black text-on-surface">
+                    <span className="w-8 text-center text-xs font-black text-on-surface select-none">
                       {quantity}
                     </span>
                     <button
                       onClick={() => updateQuantity(product.id, quantity + 1)}
-                      className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-on-surface hover:text-primary shadow-sm"
+                      disabled={quantity >= (product.stock ?? 10)}
+                      className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-on-surface hover:text-primary shadow-sm hover:scale-110 active:scale-75 transition-all duration-200 disabled:opacity-35 disabled:cursor-not-allowed"
                       aria-label="زيادة الكمية"
                     >
                       <Plus className="w-3 h-3" />
@@ -144,11 +145,16 @@ export default function CartPage() {
                     <span className="text-sm font-black text-on-surface block">
                       {(activePrice * quantity).toLocaleString('ar-DZ')} دج
                     </span>
+                    {product.stock && quantity >= product.stock && (
+                      <span className="text-[10px] text-amber-700 font-bold block">
+                        الحد الأقصى ({product.stock})
+                      </span>
+                    )}
                   </div>
 
                   <button
                     onClick={() => removeItem(product.id)}
-                    className="w-8 h-8 rounded-full text-outline hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors"
+                    className="w-8 h-8 rounded-full text-outline hover:text-red-600 hover:bg-red-50 hover:scale-110 active:scale-90 flex items-center justify-center transition-all"
                     aria-label="حذف من السلة"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -160,9 +166,10 @@ export default function CartPage() {
         </div>
 
         {/* LEFT COLUMN in RTL: Summary Box (4 Cols) */}
-        <div className="lg:col-span-4 card-stitch space-y-6 sticky top-24">
-          <h2 className="text-lg font-extrabold text-on-surface border-b border-primary/10 pb-3">
-            ملخص الطلبية (COD)
+        <div className="lg:col-span-4 card-stitch space-y-6 sticky top-24 shadow-stitch-hover border-primary/15">
+          <h2 className="text-lg font-extrabold text-on-surface border-b border-primary/10 pb-3 flex items-center justify-between">
+            <span>ملخص الطلبية (COD)</span>
+            <Sparkles className="w-4 h-4 text-secondary animate-pulse" />
           </h2>
 
           <div className="space-y-3 text-xs sm:text-sm">
@@ -177,7 +184,7 @@ export default function CartPage() {
             </div>
 
             <div className="p-3 rounded-xl bg-surface-container text-xs font-semibold text-primary flex items-center gap-2">
-              <Truck className="w-4 h-4 text-secondary shrink-0" />
+              <Truck className="w-4 h-4 text-secondary shrink-0 animate-bounce" style={{ animationDuration: '2.5s' }} />
               <span>الدفع نقداً عند استلام طلبيتك وفحصها</span>
             </div>
           </div>
@@ -208,10 +215,10 @@ export default function CartPage() {
           ) : (
             <Link
               href="/checkout"
-              className="btn-pill-secondary w-full py-4 text-sm font-extrabold shadow-stitch-coral flex items-center justify-center gap-2"
+              className="btn-pill-secondary w-full py-4 text-sm font-extrabold shadow-stitch-coral flex items-center justify-center gap-2 shimmer-container group hover:scale-[1.02] active:scale-95 transition-all duration-300"
             >
               <span>متابعة إتمام الطلب (الدفع عند الاستلام)</span>
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1.5 transition-transform" />
             </Link>
           )}
 

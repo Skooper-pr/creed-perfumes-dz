@@ -25,18 +25,29 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
   const { isAdminLoggedIn, isLoading, logout } = useAuth();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
-  // If loading or login page, just render children
   if (pathname === '/admin/login') {
     return <>{children}</>;
   }
 
+  // Show loading screen until session state is determined (prevents UI shell flash)
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-surface">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs text-on-surface-variant font-bold">جاري التحقق من صلاحيات الإدارة...</span>
+        </div>
+      </div>
+    );
+  }
+
   // Redirect if not logged in
-  if (!isLoading && !isAdminLoggedIn) {
+  if (!isAdminLoggedIn) {
     if (typeof window !== 'undefined') {
       router.push('/admin/login');
     }
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-surface">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );

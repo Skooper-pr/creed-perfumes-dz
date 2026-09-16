@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, PhoneCall, Sparkles, Truck, Clock, ArrowLeft, MessageSquare } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { Loader } from '@/components/Loader';
 
 function OrderConfirmedContent() {
   const searchParams = useSearchParams();
@@ -128,9 +129,12 @@ function OrderConfirmedContent() {
 export default function OrderConfirmedPage() {
   return (
     <Suspense fallback={
-      <div className="max-w-md mx-auto px-4 py-20 text-center">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-xs font-semibold text-on-surface-variant">جاري تأكيد طلبيتك...</p>
+      <div className="max-w-md mx-auto px-4 py-24 flex items-center justify-center">
+        <Loader
+          text="جاري تأكيد طلبيتك وحجز موعد التوصيل..."
+          subtext="سيتصل بك مندوب التوصيل قبل التوجه إلى عنوانك"
+          size={1}
+        />
       </div>
     }>
       <OrderConfirmedContent />

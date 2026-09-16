@@ -390,7 +390,7 @@ export default function TrackOrderPage() {
                         <div className="flex items-baseline gap-1.5">
                           <span className="font-bold text-on-surface">المبلغ الإجمالي للدفع عند الاستلام:</span>
                           <span className="text-base font-black text-secondary font-mono">
-                            {(order.total_price + order.delivery_fee).toLocaleString('ar-DZ')} دج
+                            {order.total_price.toLocaleString('ar-DZ')} دج
                           </span>
                         </div>
                       </div>
