@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { ShoppingBag, Check } from 'lucide-react';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
@@ -12,6 +13,7 @@ interface ProductCardProps {
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
+  const router = useRouter();
   const { addItem, items } = useCart();
   const [isJustAdded, setIsJustAdded] = React.useState(false);
   const isOutOfStock = (product.stock ?? 0) <= 0;
@@ -30,6 +32,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     addItem(product, 1);
     setIsJustAdded(true);
     setTimeout(() => setIsJustAdded(false), 700);
+  };
+
+  const handleDirectBuy = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isOutOfStock) return;
+    addItem(product, 1);
+    router.push('/checkout');
   };
 
   return (
@@ -92,7 +102,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </h3>
         </Link>
 
-        {/* Pricing & Subtle Add to Cart Action */}
+        {/* Pricing & Secondary Add to Cart Action */}
         <div className="pt-2 border-t border-[#E5E0D5]/70 flex items-center justify-between gap-2 mt-1">
           <div className="flex flex-col">
             <div className="flex items-baseline gap-1">
@@ -114,6 +124,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             </span>
           ) : (
             <button
+              type="button"
               onClick={handleAddToCart}
               aria-label={`إضافة ${product.name} إلى السلة`}
               className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 shrink-0 border ${
@@ -129,6 +140,29 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               ) : (
                 <ShoppingBag className="w-4 h-4 stroke-[1.75]" />
               )}
+            </button>
+          )}
+        </div>
+
+        {/* Primary Conversion Action: Direct Buy ("اطلب الآن") */}
+        <div className="mt-2.5">
+          {isOutOfStock ? (
+            <button
+              type="button"
+              disabled
+              className="w-full h-11 min-h-[44px] rounded-xl bg-[#FAF8F5] text-[#A8A39A] border border-[#E5E0D5] text-xs font-semibold flex items-center justify-center cursor-not-allowed select-none"
+              aria-label={`${product.name} غير متوفر`}
+            >
+              غير متوفر
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleDirectBuy}
+              aria-label={`اطلب الآن ${product.name}`}
+              className="w-full h-11 min-h-[44px] rounded-xl bg-[#151515] text-white border border-[#151515] text-xs sm:text-sm font-semibold tracking-wide flex items-center justify-center gap-1.5 transition-all duration-200 hover:bg-[#2c2c2c] active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-[#151515] focus:ring-offset-1 select-none shadow-sm cursor-pointer"
+            >
+              <span>اطلب الآن</span>
             </button>
           )}
         </div>
