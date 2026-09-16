@@ -6,16 +6,16 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 interface AuthContextType {
   isAdminLoggedIn: boolean;
   isLoading: boolean;
-  adminEmail: string | null;
   login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// This public identifier is not an email or credential; authorization is enforced again by Supabase RLS.
+const ADMIN_USER_ID = '698fd6a7-930d-45f4-93e7-0462a296646a';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [adminEmail, setAdminEmail] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -24,10 +24,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
-            setIsAdminLoggedIn(true);
-            setAdminEmail(session.user.email ?? null);
-            setIsLoading(false);
-            return;
+            if (session.user.id === ADMIN_USER_ID) {
+              setIsAdminLoggedIn(true);
+              setIsLoading(false);
+              return;
+            }
+            await supabase.auth.signOut();
           }
         } catch (e) {
           console.warn('Supabase auth check failed:', e);
@@ -52,10 +54,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           password: pass,
         });
         if (!error && data.session) {
-          setIsAdminLoggedIn(true);
-          setAdminEmail(data.user.email ?? normalizedEmail);
-          setIsLoading(false);
-          return { success: true };
+          if (data.user?.id === ADMIN_USER_ID) {
+            setIsAdminLoggedIn(true);
+            setIsLoading(false);
+            return { success: true };
+          }
+          await supabase.auth.signOut();
         }
       } catch (err: any) {
         console.warn('Supabase sign-in error:', err);
@@ -78,7 +82,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
     setIsAdminLoggedIn(false);
-    setAdminEmail(null);
   };
 
   return (
@@ -86,7 +89,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         isAdminLoggedIn,
         isLoading,
-        adminEmail,
         login,
         logout,
       }}

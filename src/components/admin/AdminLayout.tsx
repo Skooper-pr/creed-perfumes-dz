@@ -22,7 +22,7 @@ import { useAuth } from '@/context/AuthContext';
 export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
-  const { isAdminLoggedIn, isLoading, logout, adminEmail } = useAuth();
+  const { isAdminLoggedIn, isLoading, logout } = useAuth();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   // If loading or login page, just render children
@@ -145,9 +145,7 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
 
             <div className="flex items-center gap-2 text-xs font-bold bg-surface-container-low px-3 py-1.5 rounded-full border border-primary/5">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-on-surface-variant truncate max-w-[150px]">
-                {adminEmail || 'مسؤول المتجر'}
-              </span>
+              <span className="text-on-surface-variant">مسؤول المتجر</span>
             </div>
           </div>
         </header>
