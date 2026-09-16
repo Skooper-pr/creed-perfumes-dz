@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingBag, Search, Menu, X, PhoneCall, Sparkles } from 'lucide-react';
+import { ShoppingBag, Search, Menu, X } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 
 export const Header: React.FC = () => {
@@ -11,16 +11,6 @@ export const Header: React.FC = () => {
   const { totalItems } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isBouncing, setIsBouncing] = useState(false);
-
-  // Trigger bounce effect on cart icon when items change
-  React.useEffect(() => {
-    if (totalItems > 0) {
-      setIsBouncing(true);
-      const timer = setTimeout(() => setIsBouncing(false), 450);
-      return () => clearTimeout(timer);
-    }
-  }, [totalItems]);
 
   // Hide customer header in admin dashboard
   if (pathname.startsWith('/admin')) {
@@ -37,50 +27,43 @@ export const Header: React.FC = () => {
   const navLinks = [
     { href: '/', label: 'الرئيسية' },
     { href: '/products', label: 'جميع العطور' },
-    { href: '/track', label: 'تتبع طلبيتك' },
+    { href: '/track', label: 'تتبع الطلب' },
     { href: '/faq', label: 'التوصيل والضمان' },
     { href: '/contact', label: 'اتصل بنا' },
   ];
 
   return (
     <>
-      {/* Top Banner: COD announcement with luxury shimmer sweep */}
-      <div className="bg-primary text-white text-xs py-2 px-4 text-center font-medium flex items-center justify-center gap-2 shimmer-container shadow-sm">
-        <Sparkles className="w-3.5 h-3.5 text-secondary animate-pulse" />
-        <span>الدفع عند الاستلام متاح لجميع الـ 58 ولاية جزائرية • توصيل سريع وموثوق لباب منزلك</span>
-        <span className="hidden sm:inline bg-secondary/30 px-2.5 py-0.5 rounded-full text-[11px] font-bold">100% أصلي ومضمون</span>
+      {/* Top Announcement Bar: Ultra-thin, minimal, factual */}
+      <div className="bg-[#151515] text-[#FAF8F5] text-xs py-1.5 px-4 text-center font-normal tracking-wide flex items-center justify-center gap-3 border-b border-[#242424]">
+        <span>الدفع نقدًا عند الاستلام • توصيل سريع وموثوق لكافة الـ 58 ولاية</span>
       </div>
 
       <header className="sticky top-0 z-40 w-full header-glass transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-18 sm:h-20 flex items-center justify-between gap-4">
           
-          {/* Logo with luxury glow hover */}
-          <Link href="/" className="flex items-center gap-3 shrink-0 group">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white group-hover:scale-105 group-hover:shadow-stitch-glow transition-all duration-300">
-              <span className="font-serif font-black text-xl tracking-tighter">CP</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="font-serif text-xl sm:text-2xl font-black tracking-tight text-primary group-hover:text-primary-container transition-colors">
-                Creed <span className="text-secondary font-sans font-bold text-lg sm:text-xl">Perfumes</span>
-              </span>
-              <span className="text-[10px] font-bold tracking-widest text-outline uppercase -mt-1">
-                Haute Parfumerie • الجزائر
-              </span>
-            </div>
+          {/* Logo: Refined luxury typographic identity */}
+          <Link href="/" className="flex flex-col items-start shrink-0 group py-1" aria-label="Creed Perfumes الجزائر - الرئيسية">
+            <span className="font-serif text-xl sm:text-2xl font-bold tracking-[0.16em] text-[#151515] group-hover:text-[#6E603F] transition-colors uppercase">
+              CREED
+            </span>
+            <span className="text-[9px] tracking-[0.24em] text-[#77736B] uppercase -mt-0.5 font-medium">
+              PARFUMS • ALGER
+            </span>
           </Link>
 
-          {/* Desktop Nav Links */}
-          <nav className="hidden lg:flex items-center gap-1 bg-surface-container-low px-3 py-1.5 rounded-full shadow-sm border border-primary/5">
+          {/* Desktop Navigation: Editorial & Understated */}
+          <nav className="hidden lg:flex items-center gap-6" aria-label="القائمة الرئيسية">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${
+                  className={`text-sm py-1 transition-colors relative font-medium ${
                     isActive
-                      ? 'bg-primary text-white shadow-stitch-glow scale-[1.02]'
-                      : 'text-on-surface-variant hover:text-primary hover:bg-surface-container hover:scale-105'
+                      ? 'text-[#151515] font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[1.5px] after:bg-[#151515]'
+                      : 'text-[#77736B] hover:text-[#151515]'
                   }`}
                 >
                   {link.label}
@@ -89,38 +72,35 @@ export const Header: React.FC = () => {
             })}
           </nav>
 
-          {/* Search bar & Action Buttons */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Actions: Search, Cart, Mobile Menu */}
+          <div className="flex items-center gap-3 sm:gap-4">
             {/* Search Input (Desktop) */}
-            <form onSubmit={handleSearch} className="hidden md:flex items-center relative group">
+            <form onSubmit={handleSearch} className="hidden md:flex items-center relative">
               <input
                 type="text"
-                placeholder="ابحث عن عطر..."
+                placeholder="بحث عن عطر..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-44 lg:w-56 bg-surface-container-low text-on-surface text-sm pr-9 pl-4 py-2 rounded-full outline-none focus:ring-2 focus:ring-primary/30 focus:w-64 focus:bg-white transition-all duration-300 shadow-inner"
+                className="w-40 lg:w-52 bg-[#FAF8F5] text-[#151515] placeholder-[#77736B] text-xs pr-8 pl-3 py-2 rounded-full border border-[#E5E0D5] outline-none focus:border-[#151515] focus:w-60 transition-all duration-300"
               />
-              <button type="submit" aria-label="بحث" className="absolute right-3 text-outline group-hover:text-primary transition-colors">
-                <Search className="w-4 h-4" />
+              <button
+                type="submit"
+                aria-label="بحث"
+                className="absolute right-2.5 text-[#77736B] hover:text-[#151515] transition-colors"
+              >
+                <Search className="w-3.5 h-3.5" />
               </button>
             </form>
 
-            {/* Cart Button with Lively Pop */}
+            {/* Cart Button */}
             <Link
               href="/cart"
               aria-label="سلة التسوق"
-              className={`relative w-11 h-11 rounded-full bg-surface-container-low hover:bg-surface-container flex items-center justify-center text-primary transition-all duration-300 shadow-sm hover:scale-105 active:scale-95 ${
-                isBouncing ? 'ring-2 ring-secondary/50 shadow-stitch-coral' : ''
-              }`}
+              className="relative p-2.5 text-[#151515] hover:text-[#6E603F] transition-colors rounded-full hover:bg-[#FAF8F5] flex items-center justify-center"
             >
-              <ShoppingBag className={`w-5 h-5 transition-transform duration-300 ${isBouncing ? 'scale-110 text-secondary' : ''}`} />
+              <ShoppingBag className="w-5 h-5 stroke-[1.75]" />
               {totalItems > 0 && (
-                <span
-                  key={totalItems}
-                  className={`absolute -top-1 -right-1 w-5 h-5 rounded-full bg-secondary text-white text-xs font-black flex items-center justify-center ring-2 ring-white shadow-stitch-coral ${
-                    isBouncing ? 'animate-badge-pop' : ''
-                  }`}
-                >
+                <span className="absolute top-1 right-1 min-w-[17px] h-[17px] rounded-full bg-[#151515] text-white text-[10px] font-semibold flex items-center justify-center px-1">
                   {totalItems}
                 </span>
               )}
@@ -129,40 +109,40 @@ export const Header: React.FC = () => {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden w-11 h-11 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface hover:text-primary transition-colors"
-              aria-label="القائمة"
+              className="lg:hidden p-2.5 text-[#151515] hover:text-[#6E603F] transition-colors rounded-full hover:bg-[#FAF8F5] flex items-center justify-center"
+              aria-label={mobileMenuOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
 
-        {/* Mobile Dropdown Menu */}
+        {/* Mobile Drawer Menu */}
         {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-primary/10 bg-surface px-4 py-4 space-y-3 animate-in slide-in-from-top-2 shadow-xl">
-            <form onSubmit={handleSearch} className="flex items-center relative mb-4">
+          <div className="lg:hidden border-t border-[#E5E0D5] bg-white px-5 py-5 space-y-4 animate-in fade-in duration-200">
+            <form onSubmit={handleSearch} className="flex items-center relative">
               <input
                 type="text"
                 placeholder="ابحث عن عطر أو نوتة..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-surface-container text-on-surface text-sm pr-10 pl-4 py-3 rounded-full outline-none focus:ring-2 focus:ring-primary/20"
+                className="w-full bg-[#FAF8F5] text-[#151515] placeholder-[#77736B] text-sm pr-9 pl-4 py-2.5 rounded-full border border-[#E5E0D5] outline-none focus:border-[#151515]"
               />
-              <button type="submit" className="absolute right-3.5 text-outline">
-                <Search className="w-5 h-5" />
+              <button type="submit" className="absolute right-3 text-[#77736B]" aria-label="بحث">
+                <Search className="w-4 h-4" />
               </button>
             </form>
 
-            <nav className="flex flex-col gap-1">
+            <nav className="flex flex-col divide-y divide-[#E5E0D5]/50">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`px-4 py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-between ${
+                  className={`py-3 text-sm transition-colors flex items-center justify-between ${
                     pathname === link.href
-                      ? 'bg-primary text-white'
-                      : 'text-on-surface hover:bg-surface-container'
+                      ? 'text-[#151515] font-bold'
+                      : 'text-[#77736B] hover:text-[#151515]'
                   }`}
                 >
                   <span>{link.label}</span>

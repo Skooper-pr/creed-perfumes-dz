@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { 
   User, 
   Phone, 
@@ -29,7 +30,8 @@ export default function CheckoutPage() {
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
   const [phoneSecondary, setPhoneSecondary] = useState('');
-  const [selectedWilayaCode, setSelectedWilayaCode] = useState('16'); // Default to Alger
+  // Default wilaya is empty so user actively chooses their Algerian wilaya
+  const [selectedWilayaCode, setSelectedWilayaCode] = useState('');
   const [commune, setCommune] = useState('');
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
@@ -37,11 +39,11 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const currentWilaya = getWilayaByCode(selectedWilayaCode) || ALGERIA_WILAYAS[15]; // Alger fallback
-  const deliveryFee = items.length > 0 ? currentWilaya.delivery_fee : 0;
+  const currentWilaya = selectedWilayaCode ? getWilayaByCode(selectedWilayaCode) : undefined;
+  const deliveryFee = currentWilaya ? currentWilaya.delivery_fee : 0;
   const finalTotal = subtotal + deliveryFee;
 
-  // Validation
+  // Validation & Submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -51,9 +53,9 @@ export default function CheckoutPage() {
       return;
     }
 
-    const outOfStockItem = items.find(item => (item.product.stock ?? 0) <= 0);
+    const outOfStockItem = items.find((item) => (item.product.stock ?? 0) <= 0);
     if (outOfStockItem) {
-      setErrorMsg(`عذراً، العطر "${outOfStockItem.product.name}" نفذت كميته من المخزون وغير متوفر حالياً. يرجى حذفه من السلة لإكمال الطلب.`);
+      setErrorMsg(`عذراً، العطر "${outOfStockItem.product.name}" نفذت كميته من المخزون حالياً. يرجى حذفه لإكمال الطلب.`);
       return;
     }
 
@@ -62,11 +64,16 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Algerian phone format check
+    // Algerian phone format check (05, 06, 07 + 8 digits)
     const cleanPhone = phone.replace(/\s+/g, '');
     const phoneRegex = /^(05|06|07)[0-9]{8}$/;
     if (!phoneRegex.test(cleanPhone)) {
       setErrorMsg('يرجى إدخال رقم هاتف جزائري صحيح مكون من 10 أرقام (يبدأ بـ 05، 06، أو 07).');
+      return;
+    }
+
+    if (!selectedWilayaCode || !currentWilaya) {
+      setErrorMsg('يرجى اختيار الولاية لحساب تكلفة الشحن ومتابعة الطلب.');
       return;
     }
 
@@ -83,7 +90,7 @@ export default function CheckoutPage() {
     setIsSubmitting(true);
 
     try {
-      const orderItems: OrderItem[] = items.map(item => ({
+      const orderItems: OrderItem[] = items.map((item) => ({
         product_id: item.product.id,
         name: `${item.product.name} (${item.product.size || '100ml'})`,
         price: item.product.discount_price ?? item.product.price,
@@ -112,7 +119,7 @@ export default function CheckoutPage() {
       router.push(`/order-confirmed?orderId=${newOrder.id}&orderNumber=${newOrder.order_number}`);
     } catch (err: unknown) {
       console.error(err);
-      const message = err instanceof Error ? err.message : 'حدث خطأ أثناء حفظ الطلبية، يرجى المحاولة مرة أخرى.';
+      const message = err instanceof Error ? err.message : 'حدث خطأ أثناء تسجيل طلبيتك، يرجى المحاولة مرة أخرى.';
       setErrorMsg(message);
       setIsSubmitting(false);
     }
@@ -121,12 +128,12 @@ export default function CheckoutPage() {
   if (items.length === 0) {
     return (
       <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4">
-        <div className="w-16 h-16 rounded-full bg-surface-container mx-auto flex items-center justify-center text-primary">
-          <ShoppingBag className="w-8 h-8" />
+        <div className="w-16 h-16 rounded-full bg-white border border-[#E5E0D5] mx-auto flex items-center justify-center text-[#6E603F]">
+          <ShoppingBag className="w-8 h-8 stroke-[1.5]" />
         </div>
-        <h2 className="text-xl font-bold text-on-surface">سلتك فارغة</h2>
-        <p className="text-xs text-on-surface-variant">اختر عطراً من المتجر قبل التوجه لنموذج الشراء.</p>
-        <Link href="/products" className="btn-pill-primary text-xs inline-flex items-center gap-2">
+        <h2 className="text-xl font-bold text-[#151515]">سلة المشتريات فارغة</h2>
+        <p className="text-xs text-[#77736B]">يرجى اختيار عطر أولاً للتوجه لصفحة تأكيد الطلب.</p>
+        <Link href="/products" className="btn-luxury-primary text-xs inline-flex items-center gap-2">
           <span>تصفح العطور الآن</span>
           <ArrowLeft className="w-4 h-4" />
         </Link>
@@ -135,31 +142,35 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8">
       
-      {/* Top Header Card */}
-      <div className="bg-surface-container-low rounded-3xl p-6 border border-primary/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Visual Step Indicator Header */}
+      <div className="bg-white rounded-2xl p-5 sm:p-6 border border-[#E5E0D5] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <span className="text-xs font-bold text-secondary uppercase tracking-wider">
-            الدفع نقداً عند الاستلام • التوصيل لـ 58 ولاية
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight mt-1">
-            إتمام طلب الشراء المباشر (COD)
+          <div className="flex items-center gap-2 text-xs font-semibold text-[#6E603F] uppercase tracking-wide">
+            <span>الخطوة 1: بيانات الزبون</span>
+            <span>←</span>
+            <span>الخطوة 2: العنوان والشحن</span>
+            <span>←</span>
+            <span className="text-[#151515]">الخطوة 3: تأكيد الطلب</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#151515] tracking-tight mt-1">
+            إتمام طلب الشراء (الدفع عند الاستلام)
           </h1>
-          <p className="text-xs text-on-surface-variant mt-1">
-            املأ بيانات التوصيل بدقة لضمان تواصل مندوب التوصيل معك وتسليم طلبيتك في أسرع وقت.
+          <p className="text-xs text-[#77736B] mt-1">
+            املأ بيانات التوصيل بدقة ليتصل بك فريقنا لتأكيد طلبك وتجهيز الشحنة.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-secondary/15 text-secondary px-4 py-2 rounded-full font-bold text-xs shrink-0 self-start sm:self-auto">
-          <Banknote className="w-4 h-4" />
-          <span>الدفع نقداً بالدينار (دج) فقط</span>
+        <div className="flex items-center gap-2 bg-[#FAF8F5] text-[#151515] border border-[#E5E0D5] px-4 py-2 rounded-full text-xs font-semibold shrink-0 self-start sm:self-auto">
+          <Banknote className="w-4 h-4 text-[#6E603F]" />
+          <span>الدفع نقدًا عند الباب</span>
         </div>
       </div>
 
       {/* Error Alert */}
       {errorMsg && (
-        <div className="p-4 rounded-2xl bg-red-50 text-red-700 text-xs sm:text-sm font-semibold border border-red-200 animate-in fade-in">
+        <div className="p-4 rounded-xl bg-red-50 text-red-700 text-xs sm:text-sm font-semibold border border-red-200">
           {errorMsg}
         </div>
       )}
@@ -168,190 +179,208 @@ export default function CheckoutPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
         {/* RIGHT COLUMN in RTL: Customer Shipping Form (7 Cols) */}
-        <div className="lg:col-span-7 card-stitch space-y-6">
-          <div className="flex items-center gap-3 border-b border-primary/10 pb-4">
-            <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">
-              <MapPin className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-on-surface">بيانات المستلم والتوصيل</h2>
-              <p className="text-xs text-on-surface-variant">دون الحاجة لتسجيل حساب أو بطاقة بنكية</p>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-[#E5E0D5] p-5 sm:p-7 space-y-6">
+          
+          <form onSubmit={handleSubmit} className="space-y-6">
             
-            {/* Full Name */}
-            <div>
-              <label className="block text-xs font-bold text-on-surface mb-1.5" htmlFor="fullName">
-                الاسم واللقب بالكامل <span className="text-secondary">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  id="fullName"
-                  type="text"
-                  required
-                  placeholder="مثال: أمين بلقاسم"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full bg-surface-container-low text-on-surface text-sm pr-11 pl-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all"
-                />
-                <User className="w-4 h-4 text-outline absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            {/* Step 1: Customer Info */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 border-b border-[#E5E0D5] pb-2.5">
+                <span className="w-6 h-6 rounded-full bg-[#151515] text-white text-xs font-bold flex items-center justify-center">1</span>
+                <h2 className="text-sm font-bold text-[#151515]">بيانات المستلم</h2>
               </div>
-            </div>
 
-            {/* Phone Numbers Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Full Name */}
               <div>
-                <label className="block text-xs font-bold text-on-surface mb-1.5" htmlFor="phone">
-                  رقم الهاتف الرئيسي <span className="text-secondary">*</span>
+                <label className="block text-xs font-semibold text-[#151515] mb-1.5" htmlFor="fullName">
+                  الاسم واللقب بالكامل <span className="text-[#6E603F]">*</span>
                 </label>
                 <div className="relative">
                   <input
-                    id="phone"
-                    type="tel"
-                    dir="ltr"
-                    required
-                    placeholder="0550 12 34 56"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full text-right bg-surface-container-low text-on-surface text-sm pr-11 pl-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all font-mono"
-                  />
-                  <Phone className="w-4 h-4 text-outline absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-                <span className="text-[10px] text-outline mt-1 block">سيتصل بك الموزع لتأكيد الوصول</span>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-on-surface mb-1.5" htmlFor="phoneSecondary">
-                  رقم هاتف إضافي <span className="text-outline font-normal">(اختياري)</span>
-                </label>
-                <div className="relative">
-                  <input
-                    id="phoneSecondary"
-                    type="tel"
-                    dir="ltr"
-                    placeholder="0661 00 00 00"
-                    value={phoneSecondary}
-                    onChange={(e) => setPhoneSecondary(e.target.value)}
-                    className="w-full text-right bg-surface-container-low text-on-surface text-sm pr-11 pl-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all font-mono"
-                  />
-                  <Phone className="w-4 h-4 text-outline absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-                <span className="text-[10px] text-outline mt-1 block">في حال تعذر الوصول للرقم الأول</span>
-              </div>
-            </div>
-
-            {/* Wilaya (58 Wilayas dropdown) and Commune */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-on-surface mb-1.5" htmlFor="wilaya">
-                  الولاية (58 ولاية) <span className="text-secondary">*</span>
-                </label>
-                <div className="relative">
-                  <select
-                    id="wilaya"
-                    value={selectedWilayaCode}
-                    onChange={(e) => setSelectedWilayaCode(e.target.value)}
-                    className="w-full appearance-none bg-surface-container-low text-on-surface text-sm pr-11 pl-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all cursor-pointer font-semibold"
-                  >
-                    {ALGERIA_WILAYAS.map((w) => (
-                      <option key={w.code} value={w.code}>
-                        {w.name_ar} ({w.name_en}) — {w.delivery_fee} دج
-                      </option>
-                    ))}
-                  </select>
-                  <MapPin className="w-4 h-4 text-outline absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-                <span className="text-[10px] text-primary font-semibold mt-1 block">
-                  مدة التوصيل: {currentWilaya.delivery_time}
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-on-surface mb-1.5" htmlFor="commune">
-                  البلدية <span className="text-secondary">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    id="commune"
+                    id="fullName"
                     type="text"
                     required
-                    placeholder="مثال: حيدرة، سيدي يحيى"
-                    value={commune}
-                    onChange={(e) => setCommune(e.target.value)}
-                    className="w-full bg-surface-container-low text-on-surface text-sm pr-11 pl-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all"
+                    placeholder="مثال: أمين بلقاسم"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    className="w-full bg-[#FAF8F5] text-[#151515] text-sm pr-10 pl-4 py-2.5 rounded-xl border border-[#E5E0D5] outline-none focus:border-[#151515] transition-colors"
                   />
-                  <Building2 className="w-4 h-4 text-outline absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <User className="w-4 h-4 text-[#77736B] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Phone Numbers Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#151515] mb-1.5" htmlFor="phone">
+                    رقم الهاتف الرئيسي <span className="text-[#6E603F]">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="phone"
+                      type="tel"
+                      dir="ltr"
+                      required
+                      placeholder="0550 12 34 56"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full text-right bg-[#FAF8F5] text-[#151515] text-sm pr-10 pl-4 py-2.5 rounded-xl border border-[#E5E0D5] outline-none focus:border-[#151515] transition-colors font-mono"
+                    />
+                    <Phone className="w-4 h-4 text-[#77736B] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                  <span className="text-[10px] text-[#77736B] mt-1 block">للاتصال بك قبل خروج مندوب التوصيل</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#151515] mb-1.5" htmlFor="phoneSecondary">
+                    رقم هاتف إضافي <span className="text-[#77736B] font-normal">(اختياري)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="phoneSecondary"
+                      type="tel"
+                      dir="ltr"
+                      placeholder="0661 00 00 00"
+                      value={phoneSecondary}
+                      onChange={(e) => setPhoneSecondary(e.target.value)}
+                      className="w-full text-right bg-[#FAF8F5] text-[#151515] text-sm pr-10 pl-4 py-2.5 rounded-xl border border-[#E5E0D5] outline-none focus:border-[#151515] transition-colors font-mono"
+                    />
+                    <Phone className="w-4 h-4 text-[#77736B] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                  <span className="text-[10px] text-[#77736B] mt-1 block">في حال تعذر الوصول للرقم الأول</span>
                 </div>
               </div>
             </div>
 
-            {/* Address Details */}
-            <div>
-              <label className="block text-xs font-bold text-on-surface mb-1.5" htmlFor="address">
-                العنوان بالتفصيل <span className="text-secondary">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  id="address"
-                  type="text"
-                  required
-                  placeholder="مثال: حي 500 مسكن، عمارة 12، الطابق الثاني، شقة 5"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full bg-surface-container-low text-on-surface text-sm pr-11 pl-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all"
-                />
-                <MapPin className="w-4 h-4 text-outline absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            {/* Step 2: Shipping & Address */}
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center gap-2 border-b border-[#E5E0D5] pb-2.5">
+                <span className="w-6 h-6 rounded-full bg-[#151515] text-white text-xs font-bold flex items-center justify-center">2</span>
+                <h2 className="text-sm font-bold text-[#151515]">العنوان والولاية</h2>
+              </div>
+
+              {/* Wilaya & Commune */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#151515] mb-1.5" htmlFor="wilaya">
+                    الولاية (58 ولاية) <span className="text-[#6E603F]">*</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      id="wilaya"
+                      required
+                      value={selectedWilayaCode}
+                      onChange={(e) => setSelectedWilayaCode(e.target.value)}
+                      className="w-full appearance-none bg-[#FAF8F5] text-[#151515] text-xs sm:text-sm pr-10 pl-4 py-2.5 rounded-xl border border-[#E5E0D5] outline-none focus:border-[#151515] transition-colors cursor-pointer font-medium"
+                    >
+                      <option value="">-- اختر ولايتك من القائمة --</option>
+                      {ALGERIA_WILAYAS.map((w) => (
+                        <option key={w.code} value={w.code}>
+                          {w.name_ar} ({w.delivery_fee} دج)
+                        </option>
+                      ))}
+                    </select>
+                    <MapPin className="w-4 h-4 text-[#77736B] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                  {currentWilaya ? (
+                    <span className="text-[10px] text-[#6E603F] font-medium mt-1 block">
+                      مدة الشحن المقدرة: {currentWilaya.delivery_time} • تكلفة التوصيل: {currentWilaya.delivery_fee} دج
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-[#77736B] mt-1 block">
+                      يرجى اختيار ولايتك لاحتساب رسوم التوصيل تلقائياً
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#151515] mb-1.5" htmlFor="commune">
+                    البلدية <span className="text-[#6E603F]">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="commune"
+                      type="text"
+                      required
+                      placeholder="مثال: حيدرة، سيدي يحيى، بئر مراد رايس"
+                      value={commune}
+                      onChange={(e) => setCommune(e.target.value)}
+                      className="w-full bg-[#FAF8F5] text-[#151515] text-sm pr-10 pl-4 py-2.5 rounded-xl border border-[#E5E0D5] outline-none focus:border-[#151515] transition-colors"
+                    />
+                    <Building2 className="w-4 h-4 text-[#77736B] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Address */}
+              <div>
+                <label className="block text-xs font-semibold text-[#151515] mb-1.5" htmlFor="address">
+                  العنوان بالتفصيل <span className="text-[#6E603F]">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    id="address"
+                    type="text"
+                    required
+                    placeholder="الحي، اسم الشارع، رقم العمارة أو الفيلا"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="w-full bg-[#FAF8F5] text-[#151515] text-sm pr-10 pl-4 py-2.5 rounded-xl border border-[#E5E0D5] outline-none focus:border-[#151515] transition-colors"
+                  />
+                  <MapPin className="w-4 h-4 text-[#77736B] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-xs font-semibold text-[#151515] mb-1.5" htmlFor="notes">
+                  ملاحظات لمندوب التوصيل <span className="text-[#77736B] font-normal">(اختياري)</span>
+                </label>
+                <div className="relative">
+                  <textarea
+                    id="notes"
+                    rows={2}
+                    placeholder="أي إرشادات إضافية أو أوقات مفضلة للاتصال بك..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full bg-[#FAF8F5] text-[#151515] text-sm pr-10 pl-4 py-2.5 rounded-xl border border-[#E5E0D5] outline-none focus:border-[#151515] transition-colors resize-none"
+                  />
+                  <FileText className="w-4 h-4 text-[#77736B] absolute right-3 top-3 pointer-events-none" />
+                </div>
               </div>
             </div>
 
-            {/* Delivery Notes */}
-            <div>
-              <label className="block text-xs font-bold text-on-surface mb-1.5" htmlFor="notes">
-                ملاحظات خاصة بالتوصيل <span className="text-outline font-normal">(اختياري)</span>
-              </label>
-              <div className="relative">
-                <textarea
-                  id="notes"
-                  rows={2}
-                  placeholder="أوقات التواجد المفضلة، أو أي إرشادات لمندوب التوصيل..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full bg-surface-container-low text-on-surface text-sm pr-11 pl-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all resize-none"
-                />
-                <FileText className="w-4 h-4 text-outline absolute right-3.5 top-3 pointer-events-none" />
-              </div>
-            </div>
-
-            {/* Submit Button (Mobile view button) */}
-            <div className="pt-4">
+            {/* Step 3: Confirmation CTA */}
+            <div className="pt-2">
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="btn-pill-secondary w-full py-4 text-base font-black shadow-stitch-coral flex items-center justify-center gap-2"
+                className="btn-luxury-primary w-full py-4 text-sm font-semibold flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>جاري إرسال الطلبية...</span>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>جاري تأكيد طلبيتك...</span>
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 className="w-5 h-5" />
-                    <span>تأكيد الطلبية الآن (الدفع {finalTotal.toLocaleString('ar-DZ')} دج عند الاستلام)</span>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>تأكيد الطلب الآن (المبلغ: {finalTotal.toLocaleString('ar-DZ')} دج عند الاستلام)</span>
                   </>
                 )}
               </button>
+              <p className="text-center text-[11px] text-[#77736B] mt-2">
+                الدفع نقدًا عند استلام الطرد وفحصه • بدون أي دفع إلكتروني مسبق
+              </p>
             </div>
 
           </form>
         </div>
 
         {/* LEFT COLUMN in RTL: Order Summary (5 Cols) */}
-        <div className="lg:col-span-5 space-y-6">
-          <div className="card-stitch space-y-4">
-            <h3 className="text-base font-extrabold text-on-surface border-b border-primary/10 pb-3">
+        <div className="lg:col-span-5 space-y-6 sticky top-24">
+          <div className="bg-white rounded-2xl border border-[#E5E0D5] p-5 sm:p-6 space-y-5">
+            <h3 className="text-base font-bold text-[#151515] border-b border-[#E5E0D5] pb-3">
               العطور في طلبيتك ({totalItems})
             </h3>
 
@@ -362,15 +391,21 @@ export default function CheckoutPage() {
                 return (
                   <div key={product.id} className="flex items-center justify-between gap-3 text-xs">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-surface-container-low p-1 shrink-0 flex items-center justify-center">
-                        <img src={product.images[0]} alt={product.name} className="w-full h-full object-contain" />
+                      <div className="w-12 h-12 rounded-xl bg-[#FAF8F5] p-1 shrink-0 flex items-center justify-center border border-[#E5E0D5] relative overflow-hidden">
+                        <Image
+                          src={product.images[0]}
+                          alt={product.name}
+                          fill
+                          sizes="48px"
+                          className="object-contain p-1"
+                        />
                       </div>
                       <div>
-                        <span className="font-bold text-on-surface block line-clamp-1">{product.name}</span>
-                        <span className="text-outline">{product.size || '100ml'} • الكمية: {quantity}</span>
+                        <span className="font-semibold text-[#151515] block line-clamp-1">{product.name}</span>
+                        <span className="text-[#77736B] text-[11px]">{product.size || '100ml'} • الكمية: {quantity}</span>
                       </div>
                     </div>
-                    <span className="font-black text-primary shrink-0">
+                    <span className="font-bold text-[#151515] shrink-0">
                       {(activePrice * quantity).toLocaleString('ar-DZ')} دج
                     </span>
                   </div>
@@ -378,37 +413,41 @@ export default function CheckoutPage() {
               })}
             </div>
 
-            {/* Calculations */}
-            <div className="border-t border-primary/10 pt-3 space-y-2 text-xs">
-              <div className="flex items-center justify-between text-on-surface-variant">
+            {/* Calculations Breakdown */}
+            <div className="border-t border-[#E5E0D5] pt-4 space-y-2 text-xs">
+              <div className="flex items-center justify-between text-[#77736B]">
                 <span>المجموع الفرعي للعطور</span>
-                <span className="font-bold text-on-surface">{subtotal.toLocaleString('ar-DZ')} دج</span>
+                <span className="font-semibold text-[#151515]">{subtotal.toLocaleString('ar-DZ')} دج</span>
               </div>
 
-              <div className="flex items-center justify-between text-on-surface-variant">
-                <span>تكلفة التوصيل ({currentWilaya.name_ar})</span>
-                <span className="font-bold text-primary">{deliveryFee.toLocaleString('ar-DZ')} دج</span>
+              <div className="flex items-center justify-between text-[#77736B]">
+                <span>رسوم التوصيل {currentWilaya ? `(${currentWilaya.name_ar})` : ''}</span>
+                {currentWilaya ? (
+                  <span className="font-semibold text-[#151515]">{deliveryFee.toLocaleString('ar-DZ')} دج</span>
+                ) : (
+                  <span className="text-[#6E603F] font-medium text-[11px]">يرجى اختيار الولاية</span>
+                )}
               </div>
 
-              <div className="border-t border-primary/10 pt-3 flex items-baseline justify-between">
-                <span className="text-sm font-extrabold text-on-surface">المبلغ الإجمالي المستحق:</span>
+              <div className="border-t border-[#E5E0D5] pt-3 flex items-baseline justify-between">
+                <span className="text-sm font-bold text-[#151515]">المبلغ الإجمالي المستحق:</span>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-black text-primary">
+                  <span className="text-2xl font-bold text-[#151515]">
                     {finalTotal.toLocaleString('ar-DZ')}
                   </span>
-                  <span className="text-xs font-bold text-on-surface-variant">دج</span>
+                  <span className="text-xs font-medium text-[#77736B]">دج</span>
                 </div>
               </div>
             </div>
 
             {/* COD Guarantees */}
-            <div className="bg-surface-container-low p-4 rounded-2xl space-y-2.5 text-[11px] text-on-surface-variant">
-              <div className="flex items-center gap-2 text-on-surface font-semibold">
-                <ShieldCheck className="w-4 h-4 text-secondary shrink-0" />
-                <span>شراء مضمون 100% بدون أي مخاطرة</span>
+            <div className="bg-[#FAF8F5] p-4 rounded-xl space-y-2 text-xs text-[#77736B] border border-[#E5E0D5]/70">
+              <div className="flex items-center gap-2 text-[#151515] font-semibold">
+                <ShieldCheck className="w-4 h-4 text-[#6E603F] shrink-0" />
+                <span>ضمان المعاينة والدفع عند الاستلام</span>
               </div>
-              <p className="leading-relaxed">
-                لا تدفع أي دينار الآن. الموزع سيصلك إلى عنوانك في <strong>{currentWilaya.name_ar}</strong>، يمكنك معاينة العطر ثم دفع المبلغ نقداً.
+              <p className="leading-relaxed text-[11px]">
+                الموزع سيسلمك الطرد إلى عنوانك، يمكنك معاينة الزجاجة والعلبة الخارجية قبل تسليم المبلغ نقدًا.
               </p>
             </div>
           </div>

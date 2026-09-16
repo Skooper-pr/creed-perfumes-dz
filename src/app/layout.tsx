@@ -7,25 +7,63 @@ import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { CartToast } from '@/components/CartToast';
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/AuthContext';
+import { siteConfig } from '@/config/site';
 
 const cairo = Cairo({
   subsets: ['arabic', 'latin'],
   variable: '--font-cairo',
-  weight: ['400', '500', '600', '700', '800', '900'],
+  weight: ['400', '500', '600', '700'],
   display: 'swap',
 });
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
   variable: '--font-jakarta',
-  weight: ['400', '600', '700', '800'],
+  weight: ['400', '500', '600', '700'],
   display: 'swap',
 });
 
 export const metadata: Metadata = {
-  title: 'Creed Perfumes الجزائر | متجر العطور الفاخرة - الدفع عند الاستلام',
-  description: 'المتجر الأول في الجزائر لبيع عطور Creed الملكية الأصلية بنظام الدفع عند الاستلام لكافة الـ 58 ولاية. عطور نيش فاخرة وأسعار بالدينار الجزائري (دج).',
-  keywords: 'عطور الجزائر, Creed Perfumes, كريد أفينتوس, عطور رجالية, عطور نسائية, دفع عند الاستلام الجزائر, COD الجزائر, عطور أصلية',
+  metadataBase: new URL(siteConfig.url),
+  title: {
+    default: 'Creed Perfumes الجزائر | بوتيك العطور الفاخرة - الدفع عند الاستلام',
+    template: '%s | Creed Perfumes الجزائر',
+  },
+  description: 'بوتيك عطور دار Creed الفاخرة لزبائن الجزائر. تشكيلة مختارة من أرقى العطور العالمية، مع خدمة التوصيل لكافة الـ 58 ولاية جزائرية والدفع نقدًا عند الاستلام (COD).',
+  keywords: [
+    'عطور الجزائر',
+    'Creed Perfumes Algeria',
+    'كريد أفينتوس الجزائر',
+    'عطور نيش الجزائر',
+    'عطور رجالية فاخرة',
+    'عطور نسائية فاخرة',
+    'الدفع عند الاستلام الجزائر',
+    'Creed Aventus DZ',
+    'عطور 58 ولاية'
+  ],
+  authors: [{ name: 'Creed Perfumes DZ' }],
+  creator: 'Creed Perfumes DZ',
+  publisher: 'Creed Perfumes DZ',
+  robots: {
+    index: true,
+    follow: true,
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'ar_DZ',
+    url: siteConfig.url,
+    title: 'Creed Perfumes الجزائر | بوتيك العطور الفاخرة',
+    description: 'تسوق أرقى عطور دار Creed العالمية في الجزائر مع خدمة التوصيل السريع لكافة الـ 58 ولاية والدفع نقدًا عند الاستلام.',
+    siteName: 'Creed Perfumes DZ',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Creed Perfumes الجزائر | بوتيك العطور الفاخرة',
+    description: 'تسوق عطور Creed الفاخرة بنظام الدفع عند الاستلام لكافة الـ 58 ولاية جزائرية.',
+  },
+  alternates: {
+    canonical: siteConfig.url,
+  },
 };
 
 export default function RootLayout({
@@ -33,17 +71,34 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'OnlineStore',
+    name: 'Creed Perfumes الجزائر',
+    description: siteConfig.description,
+    url: siteConfig.url,
+    priceRange: '28000 DZD - 42000 DZD',
+    paymentAccepted: 'Cash on delivery',
+    currenciesAccepted: 'DZD',
+    areaServed: {
+      '@type': 'Country',
+      name: 'Algeria',
+    },
+    hasOfferCatalog: {
+      '@type': 'OfferCatalog',
+      name: 'Creed Perfumes Haute Parfumerie',
+    },
+  };
+
   return (
     <html lang="ar" dir="rtl" className={`${cairo.variable} ${jakarta.variable}`}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
-          rel="stylesheet"
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className="font-sans antialiased bg-surface text-on-surface flex flex-col min-h-screen selection:bg-primary-fixed selection:text-primary">
+      <body className="font-sans antialiased bg-[#F7F4EE] text-[#151515] flex flex-col min-h-screen selection:bg-[#E5E0D5] selection:text-[#151515]">
         <AuthProvider>
           <CartProvider>
             <Header />

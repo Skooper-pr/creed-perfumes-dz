@@ -3,12 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { 
   ShoppingBag, 
-  Sparkles, 
   ShieldCheck, 
   Truck, 
-  Clock, 
   ArrowLeft, 
   Check, 
   Plus, 
@@ -44,7 +43,7 @@ export default function ProductDetailClient() {
         setProduct(item);
         if (item) {
           const all = await getProducts();
-          setRelatedProducts(all.filter(p => p.id !== item.id).slice(0, 4));
+          setRelatedProducts(all.filter((p) => p.id !== item.id).slice(0, 4));
         }
       } catch (err) {
         console.error(err);
@@ -61,9 +60,8 @@ export default function ProductDetailClient() {
     return (
       <div className="max-w-7xl mx-auto px-4 py-24 flex items-center justify-center">
         <Loader
-          text="جاري تحميل تفاصيل العطر الملكي..."
-          subtext="خدمة التوصيل متوفرة لجميع الـ 58 ولاية جزائرية مع الدفع عند الاستلام (COD)"
-          size={1}
+          text="جاري تحميل تفاصيل العطر..."
+          subtext="خدمة التوصيل متوفرة لكافة الـ 58 ولاية جزائرية مع الدفع عند الاستلام"
         />
       </div>
     );
@@ -72,9 +70,9 @@ export default function ProductDetailClient() {
   if (!product) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-20 text-center space-y-4">
-        <h2 className="text-2xl font-bold text-on-surface">عذراً، لم يتم العثور على هذا العطر</h2>
-        <p className="text-sm text-on-surface-variant">قد يكون الرابط غير صحيح أو تم نقل العطر.</p>
-        <Link href="/products" className="btn-pill-primary text-sm inline-flex items-center gap-2">
+        <h2 className="text-2xl font-bold text-[#151515]">عذراً، لم يتم العثور على هذا العطر</h2>
+        <p className="text-xs sm:text-sm text-[#77736B]">قد يكون الرابط غير صحيح أو تم تحديث الصفحة.</p>
+        <Link href="/products" className="btn-luxury-primary text-xs sm:text-sm inline-flex items-center gap-2">
           <span>العودة لجميع العطور</span>
           <ArrowLeft className="w-4 h-4" />
         </Link>
@@ -106,12 +104,12 @@ export default function ProductDetailClient() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-12">
       
       {/* Breadcrumb navigation */}
-      <nav className="flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
-        <Link href="/" className="hover:text-primary transition-colors">الرئيسية</Link>
+      <nav className="flex items-center gap-2 text-xs text-[#77736B]">
+        <Link href="/" className="hover:text-[#151515] transition-colors">الرئيسية</Link>
         <span>/</span>
-        <Link href="/products" className="hover:text-primary transition-colors">جميع العطور</Link>
+        <Link href="/products" className="hover:text-[#151515] transition-colors">جميع العطور</Link>
         <span>/</span>
-        <span className="text-primary truncate">{product.name}</span>
+        <span className="text-[#151515] font-medium truncate">{product.name}</span>
       </nav>
 
       {/* Main Product Showcase (Two Columns) */}
@@ -119,86 +117,90 @@ export default function ProductDetailClient() {
         
         {/* RIGHT COLUMN in RTL: Image Gallery (6 Columns) */}
         <div className="lg:col-span-6 flex flex-col gap-4">
-          <div className="aspect-square rounded-3xl bg-gradient-to-tr from-surface-container-high/60 via-surface-container-low to-surface-container-lowest p-6 sm:p-10 flex flex-col items-center justify-center relative overflow-hidden shadow-stitch border border-primary/5 group shimmer-container">
-            <div className="absolute w-72 h-72 rounded-full bg-primary/20 blur-3xl animate-aura-pulse pointer-events-none" />
-            <div className="absolute -bottom-10 -right-10 w-56 h-56 rounded-full bg-secondary/20 blur-3xl animate-float-slow pointer-events-none" />
-
+          <div className="aspect-square rounded-3xl bg-[#FAF8F5] p-6 sm:p-10 flex flex-col items-center justify-center relative overflow-hidden border border-[#E5E0D5] group">
+            
+            {/* Top Badges */}
             <div className="absolute top-4 right-4 z-10 flex flex-col gap-1.5">
               {isOutOfStock ? (
-                <span className="bg-red-600 text-white text-xs font-black px-3.5 py-1.5 rounded-full shadow-sm flex items-center gap-1">
+                <span className="bg-[#151515] text-white text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1">
                   <Ban className="w-3.5 h-3.5" />
                   <span>نفذت الكمية</span>
                 </span>
               ) : hasDiscount ? (
-                <span className="bg-secondary text-white text-xs font-black px-3 py-1 rounded-full shadow-sm animate-pulse-glow">
-                  وفر {discountPercent}%
+                <span className="bg-white text-[#6E603F] border border-[#E5E0D5] text-xs font-semibold px-3 py-1 rounded-full shadow-sm">
+                  خصم {discountPercent}%
                 </span>
               ) : null}
-              {product.is_featured && !isOutOfStock && (
-                <span className="bg-primary text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
-                  <Sparkles className="w-3.5 h-3.5 text-secondary animate-pulse" />
-                  <span>عطر مميز</span>
-                </span>
-              )}
             </div>
 
-            <img
-              src={product.images[selectedImageIndex] || product.images[0]}
-              alt={product.name}
-              className="w-full h-full object-contain drop-shadow-2xl z-10 animate-float-slow group-hover:scale-105 transition-all duration-500"
-            />
-
-            {/* Synchronized dynamic shadow beneath bottle */}
-            <div className="absolute bottom-6 w-44 h-4 rounded-full bg-primary/25 blur-md animate-shadow-scale pointer-events-none" />
+            <div className="w-full h-full relative">
+              <Image
+                src={product.images[selectedImageIndex] || product.images[0]}
+                alt={product.name}
+                fill
+                priority
+                sizes="(max-width: 1024px) 90vw, 560px"
+                className="object-contain p-4 group-hover:scale-[1.02] transition-transform duration-500 ease-out"
+              />
+            </div>
           </div>
 
+          {/* Multiple Angles Thumbnails */}
           {product.images.length > 1 && (
-            <div className="flex items-center gap-3 overflow-x-auto pb-2">
+            <div className="flex items-center gap-3 overflow-x-auto pb-1">
               {product.images.map((img, idx) => (
                 <button
                   key={idx}
                   onClick={() => setSelectedImageIndex(idx)}
-                  className={`w-20 h-20 rounded-2xl p-2 bg-surface-container-low border-2 transition-all flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 ${
+                  className={`w-20 h-20 rounded-xl p-2 bg-[#FAF8F5] border transition-all flex items-center justify-center shrink-0 relative overflow-hidden ${
                     selectedImageIndex === idx
-                      ? 'border-primary shadow-stitch-glow scale-105'
-                      : 'border-transparent hover:border-primary/30'
+                      ? 'border-[#151515] shadow-sm'
+                      : 'border-[#E5E0D5] hover:border-[#77736B]'
                   }`}
+                  aria-label={`عرض الصورة ${idx + 1}`}
                 >
-                  <img src={img} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-contain" />
+                  <Image
+                    src={img}
+                    alt={`${product.name} ${idx + 1}`}
+                    fill
+                    sizes="80px"
+                    className="object-contain p-1.5"
+                  />
                 </button>
               ))}
             </div>
           )}
         </div>
 
-        {/* LEFT COLUMN in RTL: Olfactory Details & Sticky Purchase Box (6 Columns) */}
+        {/* LEFT COLUMN in RTL: Details & Purchase Panes (6 Columns) */}
         <div className="lg:col-span-6 flex flex-col gap-6">
           
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-bold text-secondary uppercase tracking-wider">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-[11px] font-semibold text-[#6E603F] tracking-[0.16em] uppercase">
                 {product.brand} • {product.concentration || 'Eau De Parfum'}
               </span>
             </div>
 
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight">
+            <h1 className="text-2xl sm:text-4xl font-bold text-[#151515] tracking-tight">
               {product.name}
             </h1>
-            <p className="text-xs text-outline font-semibold mt-1">
-              حجم العبوة: {product.size || '100ml'} • تركيز زيت عطري فاخر
+            <p className="text-xs text-[#77736B] font-medium mt-1">
+              الحجم: {product.size || '100ml'} • تركيبة زيتية أصلية مركزة
             </p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-surface-container-low border border-primary/5 flex items-center justify-between">
+          {/* Pricing Box */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E5E0D5] flex items-center justify-between">
             <div>
-              <span className="text-xs text-on-surface-variant block mb-0.5">السعر بالدينار الجزائري</span>
+              <span className="text-xs text-[#77736B] block mb-0.5">السعر بالدينار الجزائري</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-primary">
+                <span className="text-2xl sm:text-3xl font-bold text-[#151515]">
                   {activePrice.toLocaleString('ar-DZ')}
                 </span>
-                <span className="text-sm font-bold text-on-surface-variant">دج</span>
+                <span className="text-sm font-medium text-[#77736B]">دج</span>
                 {hasDiscount && (
-                  <span className="text-sm text-outline line-through">
+                  <span className="text-xs text-[#B8B2A6] line-through mr-1">
                     {product.price.toLocaleString('ar-DZ')} دج
                   </span>
                 )}
@@ -208,122 +210,124 @@ export default function ProductDetailClient() {
             <div className="text-left">
               {isOutOfStock ? (
                 <div>
-                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-red-100 text-red-700 text-xs font-black border border-red-200 shadow-sm">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#FAF8F5] text-[#151515] text-xs font-semibold border border-[#E5E0D5]">
                     <Ban className="w-3.5 h-3.5" />
-                    <span>نفذت الكمية (غير متوفر)</span>
+                    <span>نفذت الكمية</span>
                   </span>
-                  <p className="text-[11px] text-red-600 font-semibold mt-1">الطلب غير متاح حالياً</p>
+                  <p className="text-[10px] text-[#77736B] mt-1">الطلب غير متاح حالياً</p>
                 </div>
               ) : (
                 <div>
-                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#FAF8F5] text-[#6E603F] text-xs font-semibold border border-[#E5E0D5]">
                     <Check className="w-3.5 h-3.5" />
                     <span>متوفر في المخزون</span>
                   </span>
-                  <p className="text-[11px] text-on-surface-variant mt-1">الدفع عند الاستلام (COD)</p>
+                  <p className="text-[10px] text-[#77736B] mt-1">الدفع عند الاستلام</p>
                 </div>
               )}
             </div>
           </div>
 
+          {/* Story & Description */}
           <div>
-            <h3 className="text-sm font-bold text-on-surface mb-2">قصة العطر والتركيبة</h3>
-            <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
+            <h3 className="text-sm font-semibold text-[#151515] mb-2">عن العطر والتركيبة</h3>
+            <p className="text-xs sm:text-sm text-[#77736B] leading-relaxed">
               {product.description}
             </p>
           </div>
 
-          <div className="card-stitch space-y-4">
-            <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase">
-              <Layers className="w-4 h-4 text-secondary" />
+          {/* Olfactory Notes Pyramid (الهرم العطري) */}
+          <div className="bg-white rounded-2xl p-5 border border-[#E5E0D5] space-y-4">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[#151515] uppercase tracking-wide">
+              <Layers className="w-4 h-4 text-[#6E603F]" />
               <span>الهرم العطري والنوتات التكوينية</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="bg-surface-container-low p-3.5 rounded-xl flex flex-col justify-between">
+              <div className="bg-[#FAF8F5] p-3.5 rounded-xl flex flex-col justify-between border border-[#E5E0D5]/60">
                 <div>
-                  <span className="text-[11px] font-bold text-primary block mb-1">
+                  <span className="text-[11px] font-semibold text-[#6E603F] block mb-1">
                     قمة العطر (Top)
                   </span>
-                  <p className="text-xs text-on-surface-variant leading-normal">
+                  <p className="text-xs text-[#151515] leading-normal">
                     {product.fragrance_notes?.top?.join('، ') || 'برغموت منعش، فواكه ملكية'}
                   </p>
                 </div>
-                <span className="text-[10px] text-outline mt-2">الانطباع الأول (15 دقيقة)</span>
+                <span className="text-[10px] text-[#77736B] mt-2">الانطباع الأول المنعش</span>
               </div>
 
-              <div className="bg-surface-container-low p-3.5 rounded-xl flex flex-col justify-between">
+              <div className="bg-[#FAF8F5] p-3.5 rounded-xl flex flex-col justify-between border border-[#E5E0D5]/60">
                 <div>
-                  <span className="text-[11px] font-bold text-secondary block mb-1">
+                  <span className="text-[11px] font-semibold text-[#6E603F] block mb-1">
                     قلب العطر (Heart)
                   </span>
-                  <p className="text-xs text-on-surface-variant leading-normal">
+                  <p className="text-xs text-[#151515] leading-normal">
                     {product.fragrance_notes?.heart?.join('، ') || 'أخشاب البتولا، ياسمين فاخر'}
                   </p>
                 </div>
-                <span className="text-[10px] text-outline mt-2">جوهر العطر (ساعات)</span>
+                <span className="text-[10px] text-[#77736B] mt-2">جوهر العطر المتزن</span>
               </div>
 
-              <div className="bg-surface-container-low p-3.5 rounded-xl flex flex-col justify-between">
+              <div className="bg-[#FAF8F5] p-3.5 rounded-xl flex flex-col justify-between border border-[#E5E0D5]/60">
                 <div>
-                  <span className="text-[11px] font-bold text-tertiary block mb-1">
+                  <span className="text-[11px] font-semibold text-[#6E603F] block mb-1">
                     قاعدة العطر (Base)
                   </span>
-                  <p className="text-xs text-on-surface-variant leading-normal">
+                  <p className="text-xs text-[#151515] leading-normal">
                     {product.fragrance_notes?.base?.join('، ') || 'عنبر الحوت، مسك نقي، فانيليا'}
                   </p>
                 </div>
-                <span className="text-[10px] text-outline mt-2">الثبات المستمر (+24 ساعة)</span>
+                <span className="text-[10px] text-[#77736B] mt-2">عمق التركيز والفوحان</span>
               </div>
             </div>
           </div>
 
-          {/* Purchase Actions or Out of Stock Alert */}
+          {/* Purchasing Actions */}
           {isOutOfStock ? (
-            <div className="p-5 rounded-3xl bg-red-50/80 border border-red-200 text-center space-y-3">
-              <div className="flex items-center justify-center gap-2 text-red-700 font-black text-base">
-                <Ban className="w-5 h-5" />
-                <span>عذراً، هذا العطر غير متوفر حالياً في المخزون (نفذت الكمية)</span>
+            <div className="p-5 rounded-2xl bg-[#FAF8F5] border border-[#E5E0D5] text-center space-y-3">
+              <div className="flex items-center justify-center gap-2 text-[#151515] font-semibold text-sm">
+                <Ban className="w-4 h-4" />
+                <span>عذراً، هذا العطر غير متوفر حالياً في المخزون</span>
               </div>
-              <p className="text-xs text-red-600 leading-relaxed max-w-md mx-auto">
-                تم نفاد كامل الكمية المتوفرة من هذا العطر الملكي. يمكنك تصفح باقي العطور الأيقونية المتوفرة للطلب الفوري.
+              <p className="text-xs text-[#77736B] leading-relaxed max-w-md mx-auto">
+                تم نفاد كامل الكمية المتوفرة. يمكنك استكشاف باقي التشكيلات المتوفرة للتسليم الفوري.
               </p>
               <Link
                 href="/products"
-                className="btn-pill-primary text-xs py-3 px-8 inline-flex items-center gap-2 shadow-stitch-glow"
+                className="btn-luxury-outline text-xs px-6 py-2.5 inline-flex items-center gap-2"
               >
-                <span>تصفح تشكيلة العطور المتوفرة</span>
+                <span>تصفح العطور المتوفرة</span>
                 <ArrowLeft className="w-4 h-4" />
               </Link>
             </div>
           ) : (
-            <div className="space-y-4 pt-2">
+            <div className="space-y-4 pt-1">
               <div className="flex items-center gap-4">
-                <span className="text-xs font-bold text-on-surface">الكمية:</span>
-                <div className="flex items-center bg-surface-container rounded-full p-1 border border-primary/10 shadow-inner">
+                <span className="text-xs font-semibold text-[#151515]">الكمية:</span>
+                <div className="flex items-center bg-[#FAF8F5] rounded-full p-1 border border-[#E5E0D5]">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-on-surface hover:text-primary hover:scale-110 active:scale-75 transition-all duration-200 shadow-sm"
+                    className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[#151515] hover:bg-[#EFECE4] transition-colors shadow-xs"
                     aria-label="إنقاص الكمية"
                   >
                     <Minus className="w-3.5 h-3.5" />
                   </button>
-                  <span className="w-10 text-center text-sm font-black text-on-surface select-none">
+                  <span className="w-10 text-center text-sm font-bold text-[#151515] select-none">
                     {quantity}
                   </span>
                   <button
                     onClick={() => setQuantity(Math.min(product.stock ?? 10, quantity + 1))}
                     disabled={quantity >= (product.stock ?? 10)}
-                    className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-on-surface hover:text-primary hover:scale-110 active:scale-75 transition-all duration-200 shadow-sm disabled:opacity-35 disabled:cursor-not-allowed"
+                    className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[#151515] hover:bg-[#EFECE4] transition-colors shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label="زيادة الكمية"
                   >
                     <Plus className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <span className="text-xs text-on-surface-variant font-bold">
-                  الإجمالي: {(activePrice * quantity).toLocaleString('ar-DZ')} دج
+                <span className="text-xs text-[#77736B]">
+                  الإجمالي: <strong className="text-[#151515]">{(activePrice * quantity).toLocaleString('ar-DZ')} دج</strong>
                   {product.stock && quantity >= product.stock && (
-                    <span className="text-[10px] text-amber-700 block mt-0.5">
+                    <span className="text-[10px] text-[#6E603F] block mt-0.5">
                       (الحد الأقصى المتوفر: {product.stock} قطع)
                     </span>
                   )}
@@ -333,41 +337,40 @@ export default function ProductDetailClient() {
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <button
                   onClick={handleDirectBuy}
-                  className="btn-pill-secondary flex-1 text-sm py-4 shadow-stitch-coral shimmer-container hover:scale-[1.02] active:scale-95 group transition-all duration-300"
+                  className="btn-luxury-primary flex-1 text-xs sm:text-sm py-3.5 flex items-center justify-center gap-2"
                 >
-                  <ShoppingBag className="w-4 h-4 group-hover:scale-115 transition-transform" />
-                  <span>اطلب الآن مباشرة (الدفع عند الاستلام)</span>
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>اطلب الآن (الدفع عند الاستلام)</span>
                 </button>
 
                 <button
                   onClick={handleAddToCart}
-                  className={`btn-pill flex-1 text-sm py-4 transition-all duration-300 active:scale-95 ${
-                    isJustAdded
-                      ? 'bg-emerald-600 text-white shadow-emerald-500/40 animate-badge-pop'
-                      : 'btn-pill-primary shadow-stitch-glow hover:scale-[1.02]'
+                  className={`btn-luxury-outline flex-1 text-xs sm:text-sm py-3.5 transition-colors flex items-center justify-center gap-2 ${
+                    isJustAdded ? 'bg-[#151515] text-white border-[#151515]' : ''
                   }`}
                 >
                   {isJustAdded ? (
                     <>
-                      <Check className="w-5 h-5 animate-badge-pop" />
+                      <Check className="w-4 h-4" />
                       <span>تمت الإضافة بنجاح!</span>
                     </>
                   ) : (
-                    <span>أضف إلى سلة المشتريات</span>
+                    <span>أضف إلى السلة</span>
                   )}
                 </button>
               </div>
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-primary/10 text-xs">
-            <div className="flex items-center gap-2 text-on-surface-variant">
-              <Truck className="w-4 h-4 text-primary shrink-0" />
-              <span>توصيل لـ 58 ولاية (24 - 48 ساعة)</span>
+          {/* Reassurance Strip */}
+          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[#E5E0D5] text-xs text-[#77736B]">
+            <div className="flex items-center gap-2">
+              <Truck className="w-4 h-4 text-[#6E603F] shrink-0" />
+              <span>توصيل لكافة الـ 58 ولاية</span>
             </div>
-            <div className="flex items-center gap-2 text-on-surface-variant">
-              <ShieldCheck className="w-4 h-4 text-secondary shrink-0" />
-              <span>معاينة العطر قبل الدفع للموزع</span>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-[#6E603F] shrink-0" />
+              <span>معاينة الطرد والدفع نقدًا عند الباب</span>
             </div>
           </div>
 
@@ -375,13 +378,14 @@ export default function ProductDetailClient() {
 
       </div>
 
+      {/* Related Products */}
       {relatedProducts.length > 0 && (
-        <section className="space-y-6 pt-12 border-t border-primary/10">
+        <section className="space-y-6 pt-12 border-t border-[#E5E0D5]">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl sm:text-2xl font-bold text-on-surface">
-              عطور أخرى قد تروق لك من دار Creed
+            <h2 className="text-xl sm:text-2xl font-bold text-[#151515]">
+              عطور أخرى من دار Creed
             </h2>
-            <Link href="/products" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
+            <Link href="/products" className="text-xs font-semibold text-[#151515] hover:text-[#6E603F] flex items-center gap-1">
               <span>عرض الكل</span>
               <ArrowLeft className="w-3.5 h-3.5" />
             </Link>

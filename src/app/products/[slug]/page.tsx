@@ -1,6 +1,40 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import ProductDetailClient from './ProductDetailClient';
 import { INITIAL_PRODUCTS } from '@/data/initialData';
+
+interface Props {
+  params: { slug: string };
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const product = INITIAL_PRODUCTS.find((p) => p.slug === params.slug);
+
+  if (!product) {
+    return {
+      title: 'عطر فاخر | Creed Perfumes الجزائر',
+      description: 'استكشف تشكيلة عطور دار Creed الملكية الفاخرة مع خدمة الدفع عند الاستلام في الجزائر.',
+    };
+  }
+
+  const activePrice = product.discount_price ?? product.price;
+
+  return {
+    title: `${product.name} (${product.size || '100ml'}) - ${activePrice.toLocaleString('ar-DZ')} دج`,
+    description: product.description.slice(0, 160),
+    openGraph: {
+      title: `${product.name} | Creed Perfumes الجزائر`,
+      description: product.description.slice(0, 160),
+      images: product.images.length > 0 ? [{ url: product.images[0] }] : undefined,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${product.name} | Creed Perfumes الجزائر`,
+      description: product.description.slice(0, 160),
+      images: product.images.length > 0 ? [product.images[0]] : undefined,
+    },
+  };
+}
 
 export async function generateStaticParams() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

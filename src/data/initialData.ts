@@ -63,11 +63,11 @@ export const INITIAL_PRODUCTS: Product[] = [
     id: 'prod-green-irish-tweed',
     name: 'Creed Green Irish Tweed',
     slug: 'creed-green-irish-tweed',
-    description: 'العطر الكلاسيكي النبيل المفضل لدى أرستقراطيي أوروبا ونجوم هوليوود. نزهة صباحية ساحرة في الريف الأيرلندي الندي بين أوراق البنفسج المقطوفة حديثاً ونسيم البحر المنعش.',
+    description: 'العطر الكلاسيكي النبيل المفضل لعشاق التميز والأناقة الأرستقراطية. نزهة صباحية ساحرة في الريف الأيرلندي الندي بين أوراق البنفسج المقطوفة حديثاً ونسيم البحر المنعش.',
     price: 33000,
     discount_price: 28900,
     images: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBu3v-WtZ3oLnZwnhvgueiZQ0ImNUP5Ysa2WdjEHZAabIuQ9NRcI4JHo7Qlhv0-q3Yf5KUZzyd4wjdtBAgN7Kywjmx0aBpQJOuir0lJIsu_dpz3YUMuM2a08r6bMMjJ1jc6UBqxm_J-rFHReZ3L6k7_9jJZPJDQCH77HlR0lYdG0dp4x4RH4iIvllJW0Vu3Y0CIXO5Vqsqbz9rYoCWCGEFMjkVicG73goUUg9SKA-J1XbdBkzezPSWm'
+      '/images/products/green-irish-tweed.jpg'
     ],
     category_id: 'cat-men',
     category_name: 'عطور رجالية',
@@ -136,11 +136,11 @@ export const INITIAL_PRODUCTS: Product[] = [
     id: 'prod-carmina',
     name: 'Creed Carmina',
     slug: 'creed-carmina',
-    description: 'العطر الجريء الآسر بنوتات الكرز الأسود الجذاب والزعفران الحار. عطر مخصص للسيدات الواثقات الراغبات في ترك بصمة عطرية ساحرة تدوم طوال السهرة.',
+    description: 'العطر الجريء الآسر بنوتات الكرز الأسود الجذاب والزعفران الحار. عطر مخصص للسيدات الواثقات الراغبات في ترك بصمة عطرية ساحرة ذات حضور مميز.',
     price: 37000,
     discount_price: null,
     images: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBEcz8b1SegeKPxbmUYFhElgYu3eTVfB9SptfaW86OvOjCEXje1PDwTYwfJINR45v-Ujqn4K7HntsEVDQkUtfzKPZADylLr9bAN-xDJbnFkDs90XMjVdBc5UTm2zaH4N86Rgo68pDxRy0OtfPgB5v8z1IHq8FCi6Y3Qu1gNpAmvnLgAi_wZx9sm3zGNeExIXjMUByWlNvbqWJMDdBDyNRhS4Vv0XOxRfDpV2futpRRLYyT3iGvr-rO0'
+      '/images/products/creed-carmina.jpg'
     ],
     category_id: 'cat-women',
     category_name: 'عطور نسائية',

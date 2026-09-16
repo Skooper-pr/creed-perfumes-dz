@@ -11,27 +11,23 @@ interface LoaderProps {
 }
 
 export const Loader: React.FC<LoaderProps> = ({
-  text = 'جاري تجهيز الشحن والتحميل...',
+  text = 'جاري التحميل...',
   subtext,
-  size = 1,
-  royal = false,
   className = '',
 }) => {
   return (
-    <div className={`flex flex-col items-center justify-center p-8 text-center space-y-4 ${className}`}>
-      <div
-        className={`loader ${royal ? 'loader-royal' : ''}`}
-        style={{ '--size': `${size}px` } as React.CSSProperties}
-        role="status"
-        aria-label="جاري التحميل"
-      />
+    <div className={`flex flex-col items-center justify-center p-8 text-center space-y-4 ${className}`} role="status">
+      <div className="relative flex items-center justify-center">
+        <div className="w-10 h-10 rounded-full border-2 border-[#E5E0D5] border-t-[#6E603F] animate-spin" />
+        <span className="sr-only">جاري التحميل</span>
+      </div>
       {text && (
-        <p className="text-sm font-bold text-on-surface animate-pulse">
+        <p className="text-sm font-medium text-[#151515] tracking-wide">
           {text}
         </p>
       )}
       {subtext && (
-        <p className="text-xs text-on-surface-variant max-w-xs leading-relaxed">
+        <p className="text-xs text-[#77736B] max-w-xs leading-relaxed">
           {subtext}
         </p>
       )}

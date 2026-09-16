@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ShoppingBag, Sparkles, Check } from 'lucide-react';
+import { ShoppingBag, Check } from 'lucide-react';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
 
@@ -21,7 +21,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     ? Math.round(((product.price - (product.discount_price as number)) / product.price) * 100)
     : 0;
 
-  const isInCart = items.some(item => item.product.id === product.id);
+  const isInCart = items.some((item) => item.product.id === product.id);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -29,50 +29,48 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     if (isOutOfStock) return;
     addItem(product, 1);
     setIsJustAdded(true);
-    setTimeout(() => setIsJustAdded(false), 800);
+    setTimeout(() => setIsJustAdded(false), 700);
   };
 
   return (
-    <div className={`card-stitch group flex flex-col justify-between relative overflow-hidden h-full transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_16px_36px_-6px_rgba(108,59,170,0.18)] ${isOutOfStock ? 'opacity-90' : ''}`}>
-      {/* Top Badges */}
-      <div className="flex items-center justify-between gap-2 mb-2 z-10">
+    <div
+      className={`group bg-white rounded-2xl border border-[#E5E0D5] p-3.5 sm:p-4 flex flex-col justify-between transition-all duration-300 hover:shadow-luxury hover:border-[#D5CEBF] relative ${
+        isOutOfStock ? 'opacity-80' : ''
+      }`}
+    >
+      {/* Top Meta & Badges */}
+      <div className="flex items-center justify-between gap-1 mb-2 z-10 min-h-[22px]">
         {isOutOfStock ? (
-          <span className="bg-red-600 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full shadow-sm">
+          <span className="bg-[#151515] text-white text-[10px] font-medium px-2 py-0.5 rounded-full">
             نفذت الكمية
           </span>
         ) : hasDiscount ? (
-          <span className="bg-secondary text-white text-[11px] font-black px-2.5 py-0.5 rounded-full shadow-sm animate-pulse-glow">
+          <span className="bg-[#FAF8F5] text-[#6E603F] border border-[#E5E0D5] text-[10px] font-semibold px-2 py-0.5 rounded-full">
             خصم {discountPercent}%
           </span>
-        ) : product.is_featured ? (
-          <span className="bg-primary/10 text-primary text-[11px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-            <Sparkles className="w-3 h-3 text-secondary animate-spin" style={{ animationDuration: '6s' }} />
-            <span>مميز</span>
-          </span>
         ) : (
-          <span className="bg-surface-container text-on-surface-variant text-[11px] font-semibold px-2 py-0.5 rounded-full">
+          <span className="text-[10px] tracking-wider text-[#77736B] uppercase font-medium">
             {product.concentration || 'Eau De Parfum'}
           </span>
         )}
-
+        <span className="text-[10px] text-[#77736B]">{product.size || '100ml'}</span>
       </div>
 
-      {/* Bottle Image with Radial Stage & Floating Aura */}
-      <Link href={`/products/${product.slug}`} className="relative block my-3 flex-1">
-        <div className="w-full aspect-square rounded-2xl bg-gradient-to-tr from-surface-container-high/60 via-surface-container-low to-surface-container-lowest flex items-center justify-center p-4 relative overflow-hidden group-hover:bg-surface-container-high/80 transition-all duration-500">
-          {/* Subtle Glow Behind Bottle */}
-          <div className="absolute w-36 h-36 rounded-full bg-primary/15 blur-xl pointer-events-none group-hover:scale-135 group-hover:bg-primary/25 transition-all duration-700" />
-          
-          <img
+      {/* Visual Hero: Clean Product Stage with subtle scale */}
+      <Link href={`/products/${product.slug}`} className="relative block my-1 flex-1">
+        <div className="w-full aspect-square rounded-xl bg-[#FAF8F5] flex items-center justify-center p-3 relative overflow-hidden transition-colors group-hover:bg-[#F3EFE6]">
+          <Image
             src={product.images[0]}
             alt={product.name}
-            className={`w-full h-full object-contain drop-shadow-md group-hover:scale-110 group-hover:-translate-y-1 transition-all duration-500 z-10 ${isOutOfStock ? 'grayscale-[40%]' : ''}`}
+            fill
+            sizes="(max-width: 640px) 45vw, (max-width: 1024px) 25vw, 280px"
+            className="object-contain p-2 group-hover:scale-[1.03] transition-transform duration-500 ease-out"
             loading="lazy"
           />
 
           {isOutOfStock && (
-            <div className="absolute inset-0 bg-surface/60 backdrop-blur-[1px] rounded-2xl flex items-center justify-center z-20">
-              <span className="bg-red-50 text-red-700 border border-red-200 font-black text-xs px-3 py-1 rounded-full shadow-sm">
+            <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-20">
+              <span className="bg-white border border-[#E5E0D5] text-[#151515] font-semibold text-[11px] px-3 py-1 rounded-full shadow-sm">
                 غير متوفر حالياً
               </span>
             </div>
@@ -81,66 +79,55 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       </Link>
 
       {/* Product Details */}
-      <div className="pt-2 flex flex-col gap-2">
-        <div className="flex items-center justify-between text-xs text-primary font-bold">
-          <span className="group-hover:translate-x-[-2px] transition-transform">{product.category_name || product.brand}</span>
-          <span className="text-on-surface-variant font-normal text-[11px]">{product.size || '100ml'}</span>
+      <div className="pt-2.5 flex flex-col gap-1.5">
+        <div className="flex items-center justify-between text-xs text-[#77736B]">
+          <span className="text-[11px] tracking-wide uppercase font-medium">
+            {product.category_name || product.brand}
+          </span>
         </div>
 
         <Link href={`/products/${product.slug}`}>
-          <h3 className="font-bold text-base text-on-surface hover:text-primary transition-colors line-clamp-1">
+          <h3 className="font-semibold text-sm sm:text-base text-[#151515] group-hover:text-[#6E603F] transition-colors line-clamp-1">
             {product.name}
           </h3>
         </Link>
 
-        {/* Fragrance Top Notes Pills */}
-        {product.fragrance_notes?.top?.length > 0 && (
-          <p className="text-[11px] text-on-surface-variant line-clamp-1">
-            النوتات: {product.fragrance_notes.top.slice(0, 2).join(' • ')}
-          </p>
-        )}
-
-        {/* Pricing & Add to Cart Button */}
-        <div className="pt-2 border-t border-primary/5 flex items-center justify-between gap-2 mt-auto">
+        {/* Pricing & Subtle Add to Cart Action */}
+        <div className="pt-2 border-t border-[#E5E0D5]/70 flex items-center justify-between gap-2 mt-1">
           <div className="flex flex-col">
             <div className="flex items-baseline gap-1">
-              <span className="text-lg font-black text-primary group-hover:text-primary-container transition-colors">
+              <span className="text-base sm:text-lg font-bold text-[#151515] tracking-tight">
                 {activePrice.toLocaleString('ar-DZ')}
               </span>
-              <span className="text-xs font-bold text-on-surface-variant">دج</span>
+              <span className="text-xs text-[#77736B] font-medium">دج</span>
             </div>
             {hasDiscount && (
-              <span className="text-xs text-outline line-through -mt-1">
+              <span className="text-[11px] text-[#B8B2A6] line-through -mt-1">
                 {product.price.toLocaleString('ar-DZ')} دج
               </span>
             )}
           </div>
 
           {isOutOfStock ? (
-            <span
-              className="px-3 h-9 rounded-full flex items-center justify-center bg-surface-container-high text-outline text-[11px] font-bold cursor-not-allowed shrink-0 border border-outline/20"
-              title="نفذت الكمية من المخزون"
-            >
-              نفذت الكمية
+            <span className="text-[10px] text-[#B8B2A6] font-medium px-2 py-1 rounded-full bg-[#FAF8F5] border border-[#E5E0D5]">
+              نفذ
             </span>
           ) : (
             <button
               onClick={handleAddToCart}
-              aria-label={`أضف ${product.name} إلى السلة`}
-              className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm shrink-0 active:scale-90 hover:scale-108 hover:shadow-stitch-glow ${
+              aria-label={`إضافة ${product.name} إلى السلة`}
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 shrink-0 border ${
                 isJustAdded
-                  ? 'bg-emerald-600 text-white animate-badge-pop shadow-emerald-500/40'
+                  ? 'bg-[#151515] border-[#151515] text-white scale-105'
                   : isInCart
-                  ? 'bg-secondary text-white hover:bg-secondary-container'
-                  : 'bg-primary text-white hover:bg-primary-container hover:shadow-primary/30'
+                  ? 'bg-[#FAF8F5] border-[#151515] text-[#151515]'
+                  : 'border-[#E5E0D5] bg-white text-[#151515] hover:bg-[#151515] hover:text-white hover:border-[#151515]'
               }`}
             >
-              {isJustAdded ? (
-                <Check className="w-5 h-5 animate-badge-pop" />
-              ) : isInCart ? (
-                <Check className="w-5 h-5" />
+              {isJustAdded || isInCart ? (
+                <Check className="w-4 h-4 stroke-[2]" />
               ) : (
-                <ShoppingBag className="w-5 h-5" />
+                <ShoppingBag className="w-4 h-4 stroke-[1.75]" />
               )}
             </button>
           )}
