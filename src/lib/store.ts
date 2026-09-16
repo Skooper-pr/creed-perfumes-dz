@@ -367,31 +367,29 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'order_number' |
   };
 
   if (isSupabaseConfigured() && supabase) {
-    const { data, error } = await supabase.from('orders').insert(newOrder).select().single();
+    const { error } = await supabase.from('orders').insert(newOrder);
     if (error) {
       console.error('Supabase createOrder error:', error);
       throw new Error(`تعذر حفظ الطلبية في الخادم: ${error.message || 'يرجى التحقق من الاتصال بالإنترنت'}`);
     }
-    if (data) {
-      const savedOrder = data as Order;
-      const orders = getLocal<Order[]>(ORDERS_KEY, INITIAL_ORDERS);
-      orders.unshift(savedOrder);
-      setLocal(ORDERS_KEY, orders);
-      notifyDataChanged();
 
-      // Send Telegram notification to all configured admins
-      try {
-        await Promise.race([
-          sendTelegramOrderNotification(savedOrder),
-          new Promise((resolve) => setTimeout(resolve, 1500)),
-        ]);
-      } catch (err) {
-        console.warn('Telegram order notification failed:', err);
-      }
+    const savedOrder = newOrder;
+    const orders = getLocal<Order[]>(ORDERS_KEY, INITIAL_ORDERS);
+    orders.unshift(savedOrder);
+    setLocal(ORDERS_KEY, orders);
+    notifyDataChanged();
 
-      return savedOrder;
+    // Send Telegram notification to all configured admins
+    try {
+      await Promise.race([
+        sendTelegramOrderNotification(savedOrder),
+        new Promise((resolve) => setTimeout(resolve, 1500)),
+      ]);
+    } catch (err) {
+      console.warn('Telegram order notification failed:', err);
     }
-    throw new Error('لم يتم استلام تأكيد حفظ الطلبية من الخادم.');
+
+    return savedOrder;
   }
 
   // Offline demo fallback only

@@ -137,7 +137,7 @@ CREATE POLICY "Public create orders"
     WITH CHECK (
         char_length(customer_name) BETWEEN 2 AND 120 AND
         char_length(phone) BETWEEN 8 AND 30 AND
-        char_length(address) BETWEEN 5 AND 500 AND
+        char_length(address) BETWEEN 2 AND 500 AND
         jsonb_typeof(items) = 'array' AND
         jsonb_array_length(items) BETWEEN 1 AND 50 AND
         total_price >= 0 AND delivery_fee >= 0
