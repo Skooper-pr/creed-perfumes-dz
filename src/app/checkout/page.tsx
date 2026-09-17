@@ -35,6 +35,7 @@ export default function CheckoutPage() {
   const [commune, setCommune] = useState('');
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
+  const [honeypot, setHoneypot] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -50,6 +51,13 @@ export default function CheckoutPage() {
 
     if (items.length === 0) {
       setErrorMsg('سلة المشتريات فارغة. يرجى اختيار عطر أولاً.');
+      return;
+    }
+
+    // Honeypot anti-spam: bots fill hidden fields, real users don't
+    if (honeypot) {
+      // Silently pretend success to not reveal the trap
+      router.push('/order-confirmed?orderNumber=DZ-00000');
       return;
     }
 
@@ -87,6 +95,18 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Client-side phone throttle: block duplicate phone within 2 minutes
+    const cleanPhoneForThrottle = cleanPhone;
+    const throttleKey = `creed_order_throttle_${cleanPhoneForThrottle}`;
+    const lastOrderTime = localStorage.getItem(throttleKey);
+    if (lastOrderTime) {
+      const elapsed = Date.now() - parseInt(lastOrderTime, 10);
+      if (elapsed < 2 * 60 * 1000) {
+        setErrorMsg('تم تسجيل طلبية من هذا الرقم منذ أقل من دقيقتين. يرجى الانتظار قليلاً قبل تقديم طلب جديد.');
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -114,6 +134,9 @@ export default function CheckoutPage() {
 
       // Clear the cart
       clearCart();
+
+      // Record throttle timestamp for this phone
+      localStorage.setItem(`creed_order_throttle_${cleanPhone}`, String(Date.now()));
 
       // Redirect to Order Confirmed page
       router.push(`/order-confirmed?orderId=${newOrder.id}&orderNumber=${newOrder.order_number}`);
@@ -348,6 +371,19 @@ export default function CheckoutPage() {
                   <FileText className="w-4 h-4 text-[#77736B] absolute right-3 top-3 pointer-events-none" />
                 </div>
               </div>
+            </div>
+
+            {/* Honeypot anti-spam field — hidden from real users, traps bots */}
+            <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, height: 0, overflow: 'hidden' }} aria-hidden="true">
+              <label htmlFor="website_url">Leave empty</label>
+              <input
+                id="website_url"
+                type="text"
+                tabIndex={-1}
+                autoComplete="off"
+                value={honeypot}
+                onChange={(e) => setHoneypot(e.target.value)}
+              />
             </div>
 
             {/* Step 3: Confirmation CTA */}
