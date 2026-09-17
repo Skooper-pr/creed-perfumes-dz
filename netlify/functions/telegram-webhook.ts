@@ -1,3 +1,10 @@
+// TODO [SECURITY — MANUAL ACTION REQUIRED]:
+// Bot token MUST be rotated via @BotFather — the old token is permanently
+// exposed in this public repo's git history (along with the Supabase anon key
+// and admin chat ID that were previously hardcoded as fallback defaults).
+// After rotating, update the TELEGRAM_BOT_TOKEN env var in Netlify and
+// re-register the webhook URL with the new token.
+
 import { createClient } from '@supabase/supabase-js';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || '';
@@ -90,7 +97,10 @@ export const handler = async (event: { httpMethod: string; body?: string | null 
         }
 
         // Update database in Supabase via RPC (bypasses RLS securely using bot secret)
-        const secret = BOT_TOKEN || process.env.TELEGRAM_SECURITY_SECRET || 'creed_dz_bot_sec';
+        const secret = process.env.TELEGRAM_BOT_SECRET || '';
+        if (!secret) {
+          console.error('TELEGRAM_BOT_SECRET env var is not set — cannot update order status securely');
+        }
         const { data: rpcData, error: rpcError } = await supabase.rpc('update_order_status_via_bot', {
           p_order_id: orderId,
           p_status: newStatus,
