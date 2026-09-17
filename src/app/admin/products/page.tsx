@@ -44,6 +44,7 @@ export default function AdminProductsPage() {
   const [topNotes, setTopNotes] = useState('');
   const [heartNotes, setHeartNotes] = useState('');
   const [baseNotes, setBaseNotes] = useState('');
+  const [slugOverride, setSlugOverride] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -117,6 +118,7 @@ export default function AdminProductsPage() {
     setTopNotes('برغموت إيطالي، فواكه ملكية');
     setHeartNotes('أخشاب البتولا، ياسمين فاخر');
     setBaseNotes('عنبر الحوت، مسك نقي');
+    setSlugOverride('');
     setIsModalOpen(true);
   };
 
@@ -136,6 +138,7 @@ export default function AdminProductsPage() {
     setTopNotes(p.fragrance_notes?.top?.join('، ') || '');
     setHeartNotes(p.fragrance_notes?.heart?.join('، ') || '');
     setBaseNotes(p.fragrance_notes?.base?.join('، ') || '');
+    setSlugOverride(p.slug || '');
     setIsModalOpen(true);
   };
 
@@ -150,6 +153,7 @@ export default function AdminProductsPage() {
       const saved = await saveProduct({
         id: editingProduct?.id,
         name: name.trim(),
+        slug: slugOverride.trim() || undefined,
         description: description.trim(),
         price: Number(price),
         discount_price: discountPrice ? Number(discountPrice) : null,
@@ -395,6 +399,19 @@ export default function AdminProductsPage() {
                     className="w-full bg-surface-container-low text-on-surface text-sm px-4 py-2.5 rounded-xl outline-none focus:ring-2 focus:ring-primary focus:bg-white"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-on-surface mb-1">معرّف الرابط (Slug) (اختياري - بالإنجليزية)</label>
+                <input
+                  type="text"
+                  placeholder="مثال: creed-aventus-edp"
+                  value={slugOverride}
+                  onChange={(e) => setSlugOverride(e.target.value)}
+                  className="w-full bg-surface-container-low text-on-surface text-sm px-4 py-2.5 rounded-xl outline-none focus:ring-2 focus:ring-primary focus:bg-white font-mono text-left"
+                  dir="ltr"
+                />
+                <p className="text-[11px] text-on-surface-variant mt-1">اتركه فارغاً ليتم توليده تلقائياً. يُفضل تحديده إذا كان اسم العطر بالعربية.</p>
               </div>
 
               {/* Price & Discount Price */}

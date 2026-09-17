@@ -14,6 +14,26 @@ export function notifyDataChanged() {
   }
 }
 
+// Debounced Netlify Build Hook trigger — auto-rebuilds static pages after product changes
+function triggerNetlifyRebuild() {
+  if (typeof window === 'undefined') return;
+  const hookUrl = process.env.NEXT_PUBLIC_NETLIFY_BUILD_HOOK_URL || '';
+  if (!hookUrl) return;
+
+  const REBUILD_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
+  const LAST_REBUILD_KEY = 'creed_last_netlify_rebuild';
+  const lastRebuild = localStorage.getItem(LAST_REBUILD_KEY);
+  if (lastRebuild && Date.now() - parseInt(lastRebuild, 10) < REBUILD_COOLDOWN_MS) {
+    console.log('Netlify rebuild skipped — last rebuild was less than 2 minutes ago');
+    return;
+  }
+
+  localStorage.setItem(LAST_REBUILD_KEY, String(Date.now()));
+  fetch(hookUrl, { method: 'POST' })
+    .then(() => console.log('Netlify rebuild triggered'))
+    .catch((err) => console.warn('Netlify rebuild trigger failed:', err));
+}
+
 // Subscribe to store updates across tabs or within the application
 export function subscribeToStoreChanges(callback: () => void): () => void {
   if (typeof window === 'undefined') return () => {};
@@ -124,7 +144,11 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
 }
 
 export async function saveProduct(product: Partial<Product> & { name: string; price: number }): Promise<Product> {
-  const slug = product.slug || product.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+  let slug = product.slug || product.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  // If slug is empty (e.g. Arabic-only name), fall back to a unique timestamp-based slug
+  if (!slug) {
+    slug = `prod-${Date.now()}`;
+  }
   const fullProduct: Product = {
     id: product.id || `prod-${Date.now()}`,
     name: product.name,
@@ -169,6 +193,7 @@ export async function saveProduct(product: Partial<Product> & { name: string; pr
       else prods.unshift(data as Product);
       setLocal(PRODUCTS_KEY, prods);
       notifyDataChanged();
+      triggerNetlifyRebuild();
       return data as Product;
     }
   }
@@ -199,6 +224,7 @@ export async function deleteProduct(id: string): Promise<boolean> {
   const filtered = products.filter(p => p.id !== id);
   setLocal(PRODUCTS_KEY, filtered);
   notifyDataChanged();
+  triggerNetlifyRebuild();
   return true;
 }
 
@@ -365,6 +391,22 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'order_number' |
     stock_deducted: false,
     created_at: new Date().toISOString(),
   };
+
+  // (2e) Revalidate stock right before order submission
+  if (isSupabaseConfigured() && supabase) {
+    for (const item of orderData.items) {
+      const { data: liveProduct, error: stockErr } = await supabase
+        .from('products')
+        .select('stock, name')
+        .eq('id', item.product_id)
+        .single();
+      if (!stockErr && liveProduct) {
+        if ((liveProduct.stock ?? 0) < item.qty) {
+          throw new Error(`عذراً، الكمية المتوفرة من "${liveProduct.name || item.name}" (${liveProduct.stock} قطع) أقل من الكمية المطلوبة (${item.qty}). يرجى تعديل السلة.`);
+        }
+      }
+    }
+  }
 
   if (isSupabaseConfigured() && supabase) {
     const { error } = await supabase.from('orders').insert(newOrder);
