@@ -3,9 +3,8 @@
   publish = "out"
   functions = "netlify/functions"
 
-[build.environment]
-  NEXT_PUBLIC_SUPABASE_URL = "https://hkdyuasngmyzrhydariq.supabase.co"
-  NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrZHl1YXNuZ215enJoeWRhcmlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNjk5OTQsImV4cCI6MjEwNDk0NTk5NH0.quOfiPh96n8nNT7bnO32tQZtZvMQZGvRuKDIOpn7nNU"
+# NOTE: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set
+# in the Netlify dashboard (Site settings > Environment variables), NOT here.
 
 # Catch-all rewrite for dynamic product detail pages on static export (P0-2 fix)
 [[redirects]]
