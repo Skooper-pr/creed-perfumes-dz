@@ -28,6 +28,9 @@ export interface Product {
   fragrance_notes: FragranceNotes;
   concentration?: string; // e.g., 'Eau De Parfum' or 'Extrait de Parfum'
   size?: string; // e.g., '100ml'
+  is_bundle?: boolean;
+  bundle_product_ids?: string[];
+  bundle_badge?: string;
   created_at: string;
 }
 
@@ -44,6 +47,22 @@ export interface OrderItem {
   price: number;
   qty: number;
   image: string;
+  is_bundle?: boolean;
+  bundle_product_ids?: string[];
+}
+
+export interface Bundle {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  badge_label?: string;
+  price: number;
+  discount_price: number;
+  product_ids: string[];
+  image?: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 export type DeliveryProvider = 

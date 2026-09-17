@@ -1,4 +1,4 @@
-import { Product, Category, Order, OrderStatus, Coupon } from '@/types';
+import { Product, Category, Order, OrderStatus, Coupon, Bundle, OrderItem } from '@/types';
 import { INITIAL_PRODUCTS, INITIAL_CATEGORIES, INITIAL_ORDERS } from '@/data/initialData';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { sendTelegramOrderNotification } from './telegram';
@@ -8,6 +8,23 @@ const CATEGORIES_KEY = 'creed_perfumes_categories';
 const ORDERS_KEY = 'creed_perfumes_orders';
 const COUPONS_KEY = 'creed_perfumes_coupons';
 const BLOCKED_PHONES_KEY = 'creed_blocked_phones';
+const BUNDLES_KEY = 'creed_perfumes_bundles';
+
+export const INITIAL_BUNDLES: Bundle[] = [
+  {
+    id: 'bundle-aventus-silver',
+    name: 'طقم الملوك: أفينتوس + سلفر ماونتن',
+    slug: 'bundle-aventus-silver-mountain',
+    description: 'المزيج الأيقوني الأكثر طلباً من دار كريد. يجمع بين أسطورة القيادة Aventus وانتعاش جبال الألب السويسرية في عبوتين فاخرتين بحجم 100 مل بسعر استثنائي.',
+    badge_label: 'مجموعة خاصة • توفير 7,400 دج',
+    price: 62400,
+    discount_price: 55000,
+    product_ids: ['prod-creed-aventus', 'prod-silver-mountain-water'],
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBu3v-WtZ3oLnZwnhvgueiZQ0ImNUP5Ysa2WdjEHZAabIuQ9NRcI4JHo7Qlhv0-q3Yf5KUZzyd4wjdtBAgN7Kywjmx0aBpQJOuir0lJIsu_dpz3YUMuM2a08r6bMMjJ1jc6UBqxm_J-rFHReZ3L6k7_9jJZPJDQCH77HlR0lYdG0dp4x4RH4iIvllJW0Vu3Y0CIXO5Vqsqbz9rYoCWCGEFMjkVicG73goUUg9SKA-J1XbdBkzezPSWm',
+    is_active: true,
+    created_at: new Date().toISOString(),
+  },
+];
 
 // Event notification helper for live UI reactivity
 export function notifyDataChanged() {
@@ -403,14 +420,29 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'order_number' |
   // (2e) Revalidate stock right before order submission
   if (isSupabaseConfigured() && supabase) {
     for (const item of orderData.items) {
-      const { data: liveProduct, error: stockErr } = await supabase
-        .from('products')
-        .select('stock, name')
-        .eq('id', item.product_id)
-        .single();
-      if (!stockErr && liveProduct) {
-        if ((liveProduct.stock ?? 0) < item.qty) {
-          throw new Error(`عذراً، الكمية المتوفرة من "${liveProduct.name || item.name}" (${liveProduct.stock} قطع) أقل من الكمية المطلوبة (${item.qty}). يرجى تعديل السلة.`);
+      if (item.is_bundle && item.bundle_product_ids && item.bundle_product_ids.length > 0) {
+        for (const childId of item.bundle_product_ids) {
+          const { data: childProduct, error: childErr } = await supabase
+            .from('products')
+            .select('stock, name')
+            .eq('id', childId)
+            .single();
+          if (!childErr && childProduct) {
+            if ((childProduct.stock ?? 0) < item.qty) {
+              throw new Error(`عذراً، العطر "${childProduct.name}" المشمول ضمن المجموعة "${item.name}" غير متوفر بالكمية الكافية.`);
+            }
+          }
+        }
+      } else {
+        const { data: liveProduct, error: stockErr } = await supabase
+          .from('products')
+          .select('stock, name')
+          .eq('id', item.product_id)
+          .single();
+        if (!stockErr && liveProduct) {
+          if ((liveProduct.stock ?? 0) < item.qty) {
+            throw new Error(`عذراً، الكمية المتوفرة من "${liveProduct.name || item.name}" (${liveProduct.stock} قطع) أقل من الكمية المطلوبة (${item.qty}). يرجى تعديل السلة.`);
+          }
         }
       }
     }
@@ -507,11 +539,21 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus): P
   const wasDeducted = Boolean(order.stock_deducted);
   let newStockDeducted = wasDeducted;
 
+  const adjustItemStock = async (item: OrderItem, deltaQty: number) => {
+    if (item.is_bundle && item.bundle_product_ids && item.bundle_product_ids.length > 0) {
+      for (const childId of item.bundle_product_ids) {
+        await adjustProductStock(childId, deltaQty);
+      }
+    } else {
+      await adjustProductStock(item.product_id, deltaQty);
+    }
+  };
+
   if (status === 'delivered') {
     // Ensure stock is deducted upon delivery
     if (!wasDeducted && order.items && order.items.length > 0) {
       for (const item of order.items) {
-        await adjustProductStock(item.product_id, -Number(item.qty || 1));
+        await adjustItemStock(item, -Number(item.qty || 1));
       }
     }
     newStockDeducted = true;
@@ -519,7 +561,7 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus): P
     // Restore stock if it was previously deducted
     if (wasDeducted && order.items && order.items.length > 0) {
       for (const item of order.items) {
-        await adjustProductStock(item.product_id, Number(item.qty || 1));
+        await adjustItemStock(item, Number(item.qty || 1));
       }
     }
     newStockDeducted = false;
@@ -530,14 +572,14 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus): P
     if (shouldDeduct && !wasDeducted) {
       if (order.items && order.items.length > 0) {
         for (const item of order.items) {
-          await adjustProductStock(item.product_id, -Number(item.qty || 1));
+          await adjustItemStock(item, -Number(item.qty || 1));
         }
       }
       newStockDeducted = true;
     } else if (shouldRestore && wasDeducted) {
       if (order.items && order.items.length > 0) {
         for (const item of order.items) {
-          await adjustProductStock(item.product_id, Number(item.qty || 1));
+          await adjustItemStock(item, Number(item.qty || 1));
         }
       }
       newStockDeducted = false;
@@ -863,6 +905,92 @@ export async function unblockPhone(phone: string): Promise<boolean> {
   const list = getLocal<string[]>(BLOCKED_PHONES_KEY, []);
   const filtered = list.filter((p) => p !== clean);
   setLocal(BLOCKED_PHONES_KEY, filtered);
+  notifyDataChanged();
+  return true;
+}
+
+// -------------------- BUNDLES & GIFT SETS --------------------
+export async function getBundles(activeOnly = false): Promise<Bundle[]> {
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      let query = supabase.from('bundles').select('*').order('created_at', { ascending: false });
+      if (activeOnly) {
+        query = query.eq('is_active', true);
+      }
+      const { data, error } = await query;
+      if (!error && data) {
+        const bundles = data.map((b: any) => ({
+          ...b,
+          product_ids: Array.isArray(b.product_ids) ? b.product_ids : (typeof b.product_ids === 'string' ? JSON.parse(b.product_ids) : []),
+        })) as Bundle[];
+        setLocal(BUNDLES_KEY, bundles);
+        return bundles;
+      }
+    } catch (e) {
+      console.warn('Falling back to local bundles:', e);
+    }
+  }
+  const local = getLocal<Bundle[]>(BUNDLES_KEY, INITIAL_BUNDLES);
+  return activeOnly ? local.filter(b => b.is_active) : local;
+}
+
+export async function saveBundle(bundleData: Omit<Bundle, 'id' | 'created_at'> & { id?: string }): Promise<Bundle> {
+  const id = bundleData.id || `bundle-${Date.now()}`;
+  let slug = bundleData.slug?.trim();
+  if (!slug) {
+    slug = `bundle-${Date.now()}`;
+  }
+
+  const bundle: Bundle = {
+    ...bundleData,
+    id,
+    slug,
+    created_at: new Date().toISOString(),
+  };
+
+  if (isSupabaseConfigured() && supabase) {
+    const { error } = await supabase.from('bundles').upsert({
+      id: bundle.id,
+      name: bundle.name,
+      slug: bundle.slug,
+      description: bundle.description,
+      badge_label: bundle.badge_label || 'مجموعة خاصة',
+      price: bundle.price,
+      discount_price: bundle.discount_price,
+      product_ids: bundle.product_ids,
+      image: bundle.image || '',
+      is_active: bundle.is_active,
+    });
+    if (error) {
+      console.error('Supabase saveBundle error:', error);
+      throw new Error(`تعذر حفظ المجموعة: ${error.message}`);
+    }
+  }
+
+  const list = getLocal<Bundle[]>(BUNDLES_KEY, INITIAL_BUNDLES);
+  const idx = list.findIndex(b => b.id === id);
+  if (idx >= 0) {
+    list[idx] = bundle;
+  } else {
+    list.unshift(bundle);
+  }
+  setLocal(BUNDLES_KEY, list);
+  triggerNetlifyRebuild();
+  notifyDataChanged();
+  return bundle;
+}
+
+export async function deleteBundle(id: string): Promise<boolean> {
+  if (isSupabaseConfigured() && supabase) {
+    const { error } = await supabase.from('bundles').delete().eq('id', id);
+    if (error) {
+      console.error('Supabase deleteBundle error:', error);
+      throw new Error(`تعذر حذف المجموعة: ${error.message}`);
+    }
+  }
+  const list = getLocal<Bundle[]>(BUNDLES_KEY, INITIAL_BUNDLES);
+  setLocal(BUNDLES_KEY, list.filter(b => b.id !== id));
+  triggerNetlifyRebuild();
   notifyDataChanged();
   return true;
 }

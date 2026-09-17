@@ -5,22 +5,29 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Truck, Banknote, ShieldCheck, Headphones, ArrowUpRight } from 'lucide-react';
 import { ProductCard } from '@/components/ProductCard';
-import { getProducts, getCategories, subscribeToStoreChanges } from '@/lib/store';
-import { Product, Category } from '@/types';
+import { BundleCard } from '@/components/BundleCard';
+import { getProducts, getCategories, getBundles, subscribeToStoreChanges } from '@/lib/store';
+import { Product, Category, Bundle } from '@/types';
 import { Loader } from '@/components/Loader';
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [bundles, setBundles] = useState<Bundle[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [prodList, catList] = await Promise.all([getProducts(), getCategories()]);
+        const [prodList, catList, bundleList] = await Promise.all([
+          getProducts(),
+          getCategories(),
+          getBundles(true),
+        ]);
         setProducts(prodList);
         setCategories(catList);
+        setBundles(bundleList);
       } catch (e) {
         console.error(e);
       } finally {
@@ -237,6 +244,31 @@ export default function HomePage() {
 
         </div>
       </section>
+
+      {/* SECTION: Exclusive Gift Sets / Bundles */}
+      {bundles.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 w-full space-y-6">
+          <div className="border-b border-[#E5E0D5] pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+            <div>
+              <span className="text-[11px] font-semibold text-[#6E603F] tracking-wide uppercase">
+                أطقم الهدايا والمجموعات الفاخرة
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-bold text-[#151515] tracking-tight mt-0.5">
+                مجموعات Creed الخاصة (Gift Sets)
+              </h2>
+            </div>
+            <span className="text-xs text-[#77736B]">
+              وفّر عند اقتناء ثنائيات وثلاثيات العطور معاً في طقم ملكي واحد
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {bundles.map((bundle) => (
+              <BundleCard key={bundle.id} bundle={bundle} products={products} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* SECTION 3: Bestsellers & Refined Category Navigation */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 w-full space-y-6">

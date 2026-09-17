@@ -4,9 +4,10 @@ import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { ProductCard } from '@/components/ProductCard';
+import { BundleCard } from '@/components/BundleCard';
 import { Loader } from '@/components/Loader';
-import { getProducts, getCategories, subscribeToStoreChanges } from '@/lib/store';
-import { Product, Category } from '@/types';
+import { getProducts, getCategories, getBundles, subscribeToStoreChanges } from '@/lib/store';
+import { Product, Category, Bundle } from '@/types';
 
 function ProductsContent() {
   const searchParams = useSearchParams();
@@ -15,6 +16,7 @@ function ProductsContent() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [bundles, setBundles] = useState<Bundle[]>([]);
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc'>('featured');
@@ -23,9 +25,14 @@ function ProductsContent() {
   useEffect(() => {
     async function load() {
       try {
-        const [prodList, catList] = await Promise.all([getProducts(), getCategories()]);
+        const [prodList, catList, bundleList] = await Promise.all([
+          getProducts(),
+          getCategories(),
+          getBundles(true),
+        ]);
         setProducts(prodList);
         setCategories(catList);
+        setBundles(bundleList);
       } catch (err) {
         console.error(err);
       } finally {
@@ -146,6 +153,21 @@ function ProductsContent() {
         >
           الكل ({products.length})
         </button>
+
+        {bundles.length > 0 && (
+          <button
+            onClick={() => setSelectedCategory('bundles')}
+            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+              selectedCategory === 'bundles'
+                ? 'bg-[#151515] text-white'
+                : 'bg-white border border-[#B89B5E]/50 text-[#6E603F] hover:bg-[#FAF8F5]'
+            }`}
+          >
+            <span>مجموعات خاصة (Gift Sets)</span>
+            <span className="text-[10px] opacity-70">({bundles.length})</span>
+          </button>
+        )}
+
         {categories
           .filter((c) => c.slug !== 'all')
           .map((cat) => {
@@ -175,13 +197,47 @@ function ProductsContent() {
             subtext="التوصيل متوفر لكافة الـ 58 ولاية مع الدفع عند الاستلام"
           />
         </div>
-      ) : filteredProducts.length > 0 ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
+      ) : selectedCategory === 'bundles' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {bundles.map((bundle) => (
+            <BundleCard key={bundle.id} bundle={bundle} products={products} />
           ))}
         </div>
       ) : (
+        <div className="space-y-8">
+          {selectedCategory === 'all' && !searchQuery && bundles.length > 0 && (
+            <div className="bg-[#FAF8F5] rounded-3xl p-6 sm:p-8 border border-[#E5E0D5] space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-semibold text-[#6E603F] uppercase tracking-wider">
+                    أطقم الهدايا والعروض الحصرية
+                  </span>
+                  <h3 className="text-xl font-bold text-[#151515] mt-0.5">
+                    مجموعات Creed الخاصة
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setSelectedCategory('bundles')}
+                  className="text-xs text-[#6E603F] font-semibold hover:underline"
+                >
+                  عرض جميع الأطقم ({bundles.length}) ←
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {bundles.map((bundle) => (
+                  <BundleCard key={bundle.id} bundle={bundle} products={products} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filteredProducts.length > 0 ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              {filteredProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          ) : (
         <div className="bg-white rounded-2xl p-12 text-center border border-[#E5E0D5] space-y-3">
           <p className="text-base font-semibold text-[#151515]">لم يتم العثور على عطور مطابقة</p>
           <p className="text-xs text-[#77736B]">يرجى تجربة البحث باسم آخر أو إزالة التصفية الحالية.</p>
@@ -194,6 +250,8 @@ function ProductsContent() {
           >
             إعادة تعيين البحث
           </button>
+        </div>
+      )}
         </div>
       )}
 

@@ -516,5 +516,32 @@ CREATE POLICY "Admin manage blocked phones"
     USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
     WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
 
+-- 14. Product Bundles & Gift Sets (أطقم الهدايا والمجموعات الخاصة)
+CREATE TABLE IF NOT EXISTS public.bundles (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
+    description TEXT DEFAULT '',
+    badge_label TEXT DEFAULT 'مجموعة خاصة',
+    price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    discount_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    product_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+    image TEXT DEFAULT '',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
 
+ALTER TABLE public.bundles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Public select active bundles" ON public.bundles;
+CREATE POLICY "Public select active bundles"
+    ON public.bundles FOR SELECT
+    TO anon, authenticated
+    USING (is_active = true);
+
+DROP POLICY IF EXISTS "Admin manage bundles" ON public.bundles;
+CREATE POLICY "Admin manage bundles"
+    ON public.bundles FOR ALL
+    TO authenticated
+    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
+    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
