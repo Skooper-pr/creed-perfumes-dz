@@ -7,10 +7,13 @@ import { Check, Truck, Clock, ArrowLeft, MessageSquare } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Loader } from '@/components/Loader';
 import { siteConfig } from '@/config/site';
+import { trackPurchase } from '@/lib/tracking';
 
 function OrderConfirmedContent() {
   const searchParams = useSearchParams();
   const orderNumber = searchParams.get('orderNumber') || 'DZ-84921';
+  const orderId = searchParams.get('orderId') || orderNumber;
+  const total = Number(searchParams.get('total')) || 0;
 
   useEffect(() => {
     // Subtle luxury gold confetti
@@ -24,7 +27,14 @@ function OrderConfirmedContent() {
     } catch {
       // ignore
     }
-  }, []);
+
+    // Fire purchase conversion pixel
+    trackPurchase({
+      id: orderId,
+      order_number: orderNumber,
+      total_price: total,
+    });
+  }, [orderId, orderNumber, total]);
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-16 text-center space-y-8">

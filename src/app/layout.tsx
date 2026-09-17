@@ -5,6 +5,7 @@ import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { CartToast } from '@/components/CartToast';
+import { TrackingPixels } from '@/components/TrackingPixels';
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { siteConfig } from '@/config/site';
@@ -108,6 +109,7 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans antialiased bg-[#F7F4EE] text-[#151515] flex flex-col min-h-screen selection:bg-[#E5E0D5] selection:text-[#151515]">
+        <TrackingPixels />
         <AuthProvider>
           <CartProvider>
             <Header />

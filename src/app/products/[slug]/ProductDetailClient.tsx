@@ -18,6 +18,7 @@ import {
 import { getProductBySlug, getProducts, subscribeToStoreChanges } from '@/lib/store';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
+import { trackViewContent } from '@/lib/tracking';
 import { ProductCard } from '@/components/ProductCard';
 import { Loader } from '@/components/Loader';
 
@@ -45,6 +46,12 @@ export default function ProductDetailClient() {
           // Update document.title client-side so the tab matches the real product
           const activePrice = item.discount_price ?? item.price;
           document.title = `${item.name} (${item.size || '100ml'}) - ${activePrice.toLocaleString('ar-DZ')} دج | Creed Perfumes الجزائر`;
+          trackViewContent({
+            id: item.id,
+            name: item.name,
+            price: activePrice,
+            category: item.category_name,
+          });
           const all = await getProducts();
           setRelatedProducts(all.filter((p) => p.id !== item.id).slice(0, 4));
         }

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Product, CartItem } from '@/types';
+import { trackAddToCart } from '@/lib/tracking';
 
 interface CartContextType {
   items: CartItem[];
@@ -44,6 +45,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isLoaded) {
       try {
         localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+        if (items.length > 0) {
+          localStorage.setItem('creed_cart_last_interaction', String(Date.now()));
+        }
       } catch (err) {
         console.error('Failed to save cart to storage', err);
       }
@@ -80,6 +84,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     const activePrice = product.discount_price ?? product.price;
+    trackAddToCart({
+      id: product.id,
+      name: product.name,
+      price: activePrice,
+      qty: quantity,
+    });
     showToast(`تمت إضافة "${product.name}" إلى سلة المشتريات (${activePrice.toLocaleString('ar-DZ')} دج)`);
   };
 

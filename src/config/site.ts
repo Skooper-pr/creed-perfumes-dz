@@ -29,6 +29,11 @@ export interface SiteConfig {
     facebook?: string;
     tiktok?: string;
   };
+  tracking?: {
+    metaPixelId?: string;
+    tiktokPixelId?: string;
+    ga4MeasurementId?: string;
+  };
   delivery: {
     coveredWilayas: number;
     paymentMethod: string;
@@ -41,6 +46,9 @@ const envPhone = process.env.NEXT_PUBLIC_STORE_PHONE || '';
 const envWhatsapp = process.env.NEXT_PUBLIC_STORE_WHATSAPP || envPhone;
 const envInstagram = process.env.NEXT_PUBLIC_STORE_INSTAGRAM || '';
 const envTiktok = process.env.NEXT_PUBLIC_STORE_TIKTOK || '';
+const envMetaPixel = process.env.NEXT_PUBLIC_META_PIXEL_ID || '';
+const envTikTokPixel = process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID || '';
+const envGA4 = process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID || '';
 
 export const siteConfig: SiteConfig = {
   name: 'Creed Perfumes الجزائر',
@@ -66,6 +74,11 @@ export const siteConfig: SiteConfig = {
   social: {
     instagram: envInstagram || undefined,
     tiktok: envTiktok || undefined,
+  },
+  tracking: {
+    metaPixelId: envMetaPixel || undefined,
+    tiktokPixelId: envTikTokPixel || undefined,
+    ga4MeasurementId: envGA4 || undefined,
   },
   delivery: {
     coveredWilayas: 58,

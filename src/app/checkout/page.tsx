@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -21,6 +21,7 @@ import { useCart } from '@/context/CartContext';
 import { ALGERIA_WILAYAS, getWilayaByCode } from '@/data/wilayas';
 import { createOrder } from '@/lib/store';
 import { OrderItem } from '@/types';
+import { trackInitiateCheckout } from '@/lib/tracking';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -43,6 +44,13 @@ export default function CheckoutPage() {
   const currentWilaya = selectedWilayaCode ? getWilayaByCode(selectedWilayaCode) : undefined;
   const deliveryFee = currentWilaya ? currentWilaya.delivery_fee : 0;
   const finalTotal = subtotal + deliveryFee;
+
+  useEffect(() => {
+    if (items.length > 0) {
+      trackInitiateCheckout(finalTotal, items.length);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Validation & Submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -139,7 +147,7 @@ export default function CheckoutPage() {
       localStorage.setItem(`creed_order_throttle_${cleanPhone}`, String(Date.now()));
 
       // Redirect to Order Confirmed page
-      router.push(`/order-confirmed?orderId=${newOrder.id}&orderNumber=${newOrder.order_number}`);
+      router.push(`/order-confirmed?orderId=${newOrder.id}&orderNumber=${newOrder.order_number}&total=${newOrder.total_price}`);
     } catch (err: unknown) {
       console.error(err);
       const message = err instanceof Error ? err.message : 'حدث خطأ أثناء تسجيل طلبيتك، يرجى المحاولة مرة أخرى.';
