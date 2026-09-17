@@ -188,6 +188,35 @@ BEGIN
         NEW.delivery_fee := 600;
     END IF;
 
+    -- (4c) If coupon applied, validate and apply discount server-side
+    IF NEW.coupon_code IS NOT NULL AND TRIM(NEW.coupon_code) != '' THEN
+        DECLARE
+            v_coupon RECORD;
+            v_disc NUMERIC(12, 2) := 0;
+        BEGIN
+            SELECT * INTO v_coupon FROM public.coupons 
+            WHERE UPPER(code) = UPPER(TRIM(NEW.coupon_code)) 
+              AND is_active = true 
+              AND (expires_at IS NULL OR expires_at > now())
+              AND (max_uses IS NULL OR used_count < max_uses);
+
+            IF FOUND THEN
+                IF v_coupon.min_order_amount IS NULL OR calculated_subtotal >= v_coupon.min_order_amount THEN
+                    IF v_coupon.discount_type = 'percentage' THEN
+                        v_disc := ROUND((calculated_subtotal * v_coupon.discount_value) / 100, 2);
+                    ELSE
+                        v_disc := LEAST(calculated_subtotal, v_coupon.discount_value);
+                    END IF;
+                    NEW.discount_amount := v_disc;
+                    calculated_subtotal := GREATEST(0, calculated_subtotal - v_disc);
+
+                    -- Increment coupon usage count
+                    UPDATE public.coupons SET used_count = used_count + 1 WHERE id = v_coupon.id;
+                END IF;
+            END IF;
+        END;
+    END IF;
+
     -- Enforce total_price server-side
     NEW.total_price := calculated_subtotal + NEW.delivery_fee;
 
@@ -426,4 +455,43 @@ CREATE POLICY "Admin manage stock notifications"
     TO authenticated
     USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
     WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
+
+-- 12. Coupons & Promo Codes
+CREATE TABLE IF NOT EXISTS public.coupons (
+    id TEXT PRIMARY KEY DEFAULT ('cpn-' || gen_random_uuid()),
+    code TEXT NOT NULL UNIQUE,
+    discount_type TEXT NOT NULL DEFAULT 'percentage', -- 'percentage' or 'fixed'
+    discount_value NUMERIC(10, 2) NOT NULL,
+    min_order_amount NUMERIC(10, 2) DEFAULT 0,
+    max_uses INT DEFAULT NULL,
+    used_count INT NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    expires_at TIMESTAMPTZ DEFAULT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+ALTER TABLE public.coupons ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public select active coupons" ON public.coupons;
+CREATE POLICY "Allow public select active coupons"
+    ON public.coupons FOR SELECT
+    TO anon, authenticated
+    USING (is_active = true);
+
+DROP POLICY IF EXISTS "Admin manage coupons" ON public.coupons;
+CREATE POLICY "Admin manage coupons"
+    ON public.coupons FOR ALL
+    TO authenticated
+    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
+    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
+
+-- Add coupon columns to orders table
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS coupon_code TEXT DEFAULT NULL;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12, 2) DEFAULT 0;
+
+-- Initial Seed Coupon: WELCOME10 (10% off)
+INSERT INTO public.coupons (id, code, discount_type, discount_value, min_order_amount, is_active)
+VALUES ('cpn-welcome10', 'CREED10', 'percentage', 10, 10000, true)
+ON CONFLICT (code) DO NOTHING;
+
 

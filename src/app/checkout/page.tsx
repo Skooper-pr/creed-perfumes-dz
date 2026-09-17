@@ -15,12 +15,13 @@ import {
   ShieldCheck, 
   Banknote, 
   ArrowLeft,
-  CheckCircle2
+  CheckCircle2,
+  Tag
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { ALGERIA_WILAYAS, getWilayaByCode } from '@/data/wilayas';
-import { createOrder } from '@/lib/store';
-import { OrderItem } from '@/types';
+import { createOrder, validateCoupon } from '@/lib/store';
+import { OrderItem, Coupon } from '@/types';
 import { trackInitiateCheckout } from '@/lib/tracking';
 
 export default function CheckoutPage() {
@@ -38,12 +39,49 @@ export default function CheckoutPage() {
   const [notes, setNotes] = useState('');
   const [honeypot, setHoneypot] = useState('');
 
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const currentWilaya = selectedWilayaCode ? getWilayaByCode(selectedWilayaCode) : undefined;
   const deliveryFee = currentWilaya ? currentWilaya.delivery_fee : 0;
-  const finalTotal = subtotal + deliveryFee;
+  const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+  const finalTotal = discountedSubtotal + deliveryFee;
+
+  const handleApplyCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!couponCode.trim()) return;
+    setCouponError(null);
+    setValidatingCoupon(true);
+    try {
+      const res = await validateCoupon(couponCode, subtotal);
+      if (res.valid && res.coupon) {
+        setAppliedCoupon(res.coupon);
+        setDiscountAmount(res.discount);
+      } else {
+        setAppliedCoupon(null);
+        setDiscountAmount(0);
+        setCouponError(res.error || 'رمز الكوبون غير صالح');
+      }
+    } catch {
+      setCouponError('تعذر التحقق من الكوبون حالياً');
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setDiscountAmount(0);
+    setCouponCode('');
+    setCouponError(null);
+  };
 
   useEffect(() => {
     if (items.length > 0) {
@@ -138,6 +176,8 @@ export default function CheckoutPage() {
         items: orderItems,
         total_price: finalTotal,
         delivery_fee: deliveryFee,
+        coupon_code: appliedCoupon ? appliedCoupon.code : undefined,
+        discount_amount: discountAmount,
       });
 
       // Clear the cart
@@ -457,12 +497,67 @@ export default function CheckoutPage() {
               })}
             </div>
 
+            {/* Coupon Code Section */}
+            <div className="border-t border-[#E5E0D5] pt-3.5">
+              {appliedCoupon ? (
+                <div className="p-3 bg-[#FAF8F5] rounded-xl border border-[#B89B5E]/40 flex items-center justify-between text-xs">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5 font-bold text-[#151515]">
+                      <Tag className="w-3.5 h-3.5 text-[#6E603F]" />
+                      <span className="font-mono">{appliedCoupon.code}</span>
+                      <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">تم الخصم</span>
+                    </div>
+                    <span className="text-[11px] text-[#6E603F]">
+                      وفّرت {discountAmount.toLocaleString('ar-DZ')} دج
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="text-[11px] text-red-600 hover:underline font-medium"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleApplyCoupon} className="space-y-1.5">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="رمز الكوبون (مثال: CREED10)"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value)}
+                      className="flex-1 bg-[#FAF8F5] text-[#151515] text-xs px-3 py-2 rounded-xl border border-[#E5E0D5] outline-none font-mono uppercase"
+                      dir="ltr"
+                    />
+                    <button
+                      type="submit"
+                      disabled={validatingCoupon || !couponCode.trim()}
+                      className="btn-luxury text-xs px-3.5 py-2 shrink-0 disabled:opacity-50"
+                    >
+                      {validatingCoupon ? '...' : 'تطبيق'}
+                    </button>
+                  </div>
+                  {couponError && (
+                    <p className="text-[11px] text-red-600 text-right">{couponError}</p>
+                  )}
+                </form>
+              )}
+            </div>
+
             {/* Calculations Breakdown */}
             <div className="border-t border-[#E5E0D5] pt-4 space-y-2 text-xs">
               <div className="flex items-center justify-between text-[#77736B]">
                 <span>المجموع الفرعي للعطور</span>
                 <span className="font-semibold text-[#151515]">{subtotal.toLocaleString('ar-DZ')} دج</span>
               </div>
+
+              {discountAmount > 0 && (
+                <div className="flex items-center justify-between text-emerald-700 font-medium">
+                  <span>خصم الكوبون ({appliedCoupon?.code})</span>
+                  <span>-{discountAmount.toLocaleString('ar-DZ')} دج</span>
+                </div>
+              )}
 
               <div className="flex items-center justify-between text-[#77736B]">
                 <span>رسوم التوصيل {currentWilaya ? `(${currentWilaya.name_ar})` : ''}</span>

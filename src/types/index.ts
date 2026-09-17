@@ -80,6 +80,8 @@ export interface Order {
   shipping_label_url?: string;
   delivery_status_raw?: string;
   last_delivery_sync?: string;
+  coupon_code?: string;
+  discount_amount?: number;
   created_at: string;
 }
 
@@ -122,4 +124,18 @@ export interface StockNotification {
   status: 'pending' | 'notified' | 'cancelled';
   created_at: string;
 }
+
+export interface Coupon {
+  id: string;
+  code: string;
+  discount_type: 'percentage' | 'fixed';
+  discount_value: number;
+  min_order_amount?: number;
+  max_uses?: number | null;
+  used_count: number;
+  is_active: boolean;
+  expires_at?: string | null;
+  created_at: string;
+}
+
 
