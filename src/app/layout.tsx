@@ -6,6 +6,7 @@ import { Footer } from '@/components/Footer';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { CartToast } from '@/components/CartToast';
 import { TrackingPixels } from '@/components/TrackingPixels';
+import { AbandonedCartBanner } from '@/components/AbandonedCartBanner';
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { siteConfig } from '@/config/site';
@@ -119,6 +120,7 @@ export default function RootLayout({
             <Footer />
             <MobileBottomNav />
             <CartToast />
+            <AbandonedCartBanner />
           </CartProvider>
         </AuthProvider>
       </body>
