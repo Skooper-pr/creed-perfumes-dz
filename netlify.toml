@@ -23,3 +23,13 @@
   from = "/api/delivery-proxy"
   to = "/.netlify/functions/delivery-proxy"
   status = 200
+
+# Scheduled Daily Sales Digest (Runs daily at 21:00 Algiers time = 20:00 UTC)
+[functions."daily-digest"]
+  schedule = "0 20 * * *"
+
+[[redirects]]
+  from = "/api/daily-digest"
+  to = "/.netlify/functions/daily-digest"
+  status = 200
+

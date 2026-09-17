@@ -6,6 +6,7 @@
 // re-register the webhook URL with the new token.
 
 import { createClient } from '@supabase/supabase-js';
+import { calculateSalesStats, formatDailyDigestMessage } from './shared/stats';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || '';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://hkdyuasngmyzrhydariq.supabase.co';
@@ -268,33 +269,16 @@ export const handler = async (event: { httpMethod: string; body?: string | null 
           }
         }
       } else if (text.startsWith('/stats')) {
-        const todayStr = new Date().toISOString().split('T')[0];
         const { data: allOrders } = await supabase
           .from('orders')
-          .select('status, total_price, created_at');
+          .select('*');
 
-        const ordersList = allOrders || [];
-        const todayOrders = ordersList.filter((o) => (o.created_at || '').startsWith(todayStr));
-        const pendingCount = ordersList.filter((o) => o.status === 'pending').length;
-        const deliveredCount = ordersList.filter((o) => o.status === 'delivered').length;
-        const confirmedCount = ordersList.filter((o) => o.status === 'confirmed' || o.status === 'shipped').length;
-
-        const totalDeliveredRevenue = ordersList
-          .filter((o) => o.status === 'delivered')
-          .reduce((acc, o) => acc + (Number(o.total_price) || 0), 0);
+        const stats = calculateSalesStats(allOrders || []);
+        const statsMessage = formatDailyDigestMessage(stats);
 
         await callTelegram('sendMessage', {
           chat_id: chatId,
-          text: `📊 *تقرير مبيعات متجر Creed Perfumes:*
-━━━━━━━━━━━━━━━━━━━━
-📅 *طلبيات اليوم:* ${todayOrders.length} طلبية
-⏳ *طلبيات معلقة بانتظار التأكيد:* ${pendingCount}
-🚚 *طلبيات مؤكدة وقيد التوصيل:* ${confirmedCount}
-📦 *إجمالي الطلبيات المسلمة (الناجحة):* ${deliveredCount}
-
-💰 *إجمالي المداخيل المحصلة (Delivered COD):*
-*${totalDeliveredRevenue.toLocaleString('ar-DZ')} دج*
-━━━━━━━━━━━━━━━━━━━━`,
+          text: statsMessage,
           parse_mode: 'Markdown',
         });
       } else if (text.startsWith('/help')) {
