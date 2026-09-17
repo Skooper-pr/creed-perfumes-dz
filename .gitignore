@@ -38,3 +38,8 @@ yarn-error.log*
 # reference archive
 stitch_.zip
 stitch_ref/
+
+# agent & IDE directories
+.agents/
+.claude/
+testsprite-plans/
