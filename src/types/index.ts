@@ -114,3 +114,12 @@ export interface Wilaya {
   delivery_time: string;
 }
 
+export interface StockNotification {
+  id: string;
+  product_id: string;
+  product_name: string;
+  phone: string;
+  status: 'pending' | 'notified' | 'cancelled';
+  created_at: string;
+}
+

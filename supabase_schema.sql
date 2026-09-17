@@ -401,3 +401,29 @@ INSERT INTO public.products (
     '{"top": ["برغموت كالابريا", "يوسفي منعش", "نيرولي"], "heart": ["شاي أخضر نقي", "كشمش أسود جبلي", "أوزون متجمد"], "base": ["مسك ناصع", "خشب الصندل", "بيتي غران", "صمغ راتينجي"]}'::jsonb
 )
 ON CONFLICT (id) DO NOTHING;
+
+-- 11. Stock Notifications ("Notify me when back in stock")
+CREATE TABLE IF NOT EXISTS public.stock_notifications (
+    id TEXT PRIMARY KEY DEFAULT ('notif-' || gen_random_uuid()),
+    product_id TEXT NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+    product_name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+ALTER TABLE public.stock_notifications ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public insert stock notifications" ON public.stock_notifications;
+CREATE POLICY "Allow public insert stock notifications"
+    ON public.stock_notifications FOR INSERT
+    TO anon, authenticated
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admin manage stock notifications" ON public.stock_notifications;
+CREATE POLICY "Admin manage stock notifications"
+    ON public.stock_notifications FOR ALL
+    TO authenticated
+    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
+    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
+

@@ -612,3 +612,44 @@ export async function getOrdersByPhone(query: string): Promise<Order[]> {
     return matchOrderNum || matchPhone || matchSecondary;
   });
 }
+
+/**
+ * Register a customer's phone to be notified when an out-of-stock perfume is replenished
+ */
+export async function requestStockNotification(
+  productId: string,
+  productName: string,
+  phone: string
+): Promise<{ success: boolean; error?: string }> {
+  const cleanPhone = phone.trim().replace(/[\s-]/g, '');
+  if (!cleanPhone || cleanPhone.length < 9) {
+    return { success: false, error: 'يرجى إدخال رقم هاتف صحيح' };
+  }
+
+  const newNotif = {
+    id: `notif-${Date.now()}`,
+    product_id: productId,
+    product_name: productName,
+    phone: cleanPhone,
+    status: 'pending',
+    created_at: new Date().toISOString(),
+  };
+
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      const { error } = await supabase.from('stock_notifications').insert(newNotif);
+      if (error) {
+        console.warn('Supabase stock notification error:', error);
+      }
+    } catch (e) {
+      console.warn('Supabase stock notification write failed:', e);
+    }
+  }
+
+  const notifs = getLocal<any[]>('creed_stock_notifications', []);
+  notifs.unshift(newNotif);
+  setLocal('creed_stock_notifications', notifs);
+
+  return { success: true };
+}
+

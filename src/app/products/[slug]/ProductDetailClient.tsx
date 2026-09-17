@@ -13,9 +13,11 @@ import {
   Plus, 
   Minus,
   Layers,
-  Ban
+  Ban,
+  Bell,
+  CheckCircle2
 } from 'lucide-react';
-import { getProductBySlug, getProducts, subscribeToStoreChanges } from '@/lib/store';
+import { getProductBySlug, getProducts, subscribeToStoreChanges, requestStockNotification } from '@/lib/store';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { trackViewContent } from '@/lib/tracking';
@@ -34,7 +36,32 @@ export default function ProductDetailClient() {
   const [loading, setLoading] = useState(true);
   const [isJustAdded, setIsJustAdded] = useState(false);
 
+  // Back-in-stock notification state
+  const [notifyPhone, setNotifyPhone] = useState('');
+  const [notifySubmitting, setNotifySubmitting] = useState(false);
+  const [notifySuccess, setNotifySuccess] = useState(false);
+  const [notifyError, setNotifyError] = useState<string | null>(null);
+
   const { addItem } = useCart();
+
+  const handleStockNotify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!product) return;
+    setNotifyError(null);
+    setNotifySubmitting(true);
+    try {
+      const res = await requestStockNotification(product.id, product.name, notifyPhone);
+      if (res.success) {
+        setNotifySuccess(true);
+      } else {
+        setNotifyError(res.error || 'تعذر تسجيل الطلب، يرجى إدخال رقم هاتف صحيح');
+      }
+    } catch {
+      setNotifyError('حدث خطأ، يرجى المحاولة مرة أخرى');
+    } finally {
+      setNotifySubmitting(false);
+    }
+  };
 
   useEffect(() => {
     async function load() {
@@ -294,21 +321,59 @@ export default function ProductDetailClient() {
 
           {/* Purchasing Actions */}
           {isOutOfStock ? (
-            <div className="p-5 rounded-2xl bg-[#FAF8F5] border border-[#E5E0D5] text-center space-y-3">
-              <div className="flex items-center justify-center gap-2 text-[#151515] font-semibold text-sm">
-                <Ban className="w-4 h-4" />
-                <span>عذراً، هذا العطر غير متوفر حالياً في المخزون</span>
+            <div className="p-6 rounded-2xl bg-[#FAF8F5] border border-[#E5E0D5] text-center space-y-4 shadow-sm">
+              <div className="flex items-center justify-center gap-2 text-[#151515] font-bold text-sm">
+                <Ban className="w-4 h-4 text-[#77736B]" />
+                <span>نفدت الكمية المتوفرة من هذا العطر الملكي</span>
               </div>
               <p className="text-xs text-[#77736B] leading-relaxed max-w-md mx-auto">
-                تم نفاد كامل الكمية المتوفرة. يمكنك استكشاف باقي التشكيلات المتوفرة للتسليم الفوري.
+                سجل رقم هاتفك لنقوم بإشعارك فور وصول دفعة جديدة ومحدودة من دار Creed.
               </p>
-              <Link
-                href="/products"
-                className="btn-luxury-outline text-xs px-6 py-2.5 inline-flex items-center gap-2"
-              >
-                <span>تصفح العطور المتوفرة</span>
-                <ArrowLeft className="w-4 h-4" />
-              </Link>
+
+              {notifySuccess ? (
+                <div className="p-4 rounded-xl bg-white border border-[#B89B5E]/40 text-xs font-medium text-[#151515] space-y-1">
+                  <div className="flex items-center justify-center gap-1.5 text-[#6E603F] font-bold">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>تم تسجيل طلب التنبيه بنجاح!</span>
+                  </div>
+                  <p className="text-[11px] text-[#77736B]">سنتواصل معك عبر الهاتف أو الرسائل فور توفر العطر مجدداً.</p>
+                </div>
+              ) : (
+                <form onSubmit={handleStockNotify} className="max-w-md mx-auto space-y-2.5">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="tel"
+                      required
+                      placeholder="رقم هاتفك (مثال: 0550123456)"
+                      value={notifyPhone}
+                      onChange={(e) => setNotifyPhone(e.target.value)}
+                      className="flex-1 bg-white text-[#151515] text-xs px-4 py-2.5 rounded-xl border border-[#E5E0D5] outline-none focus:border-[#151515] focus:ring-1 focus:ring-[#151515]"
+                      dir="ltr"
+                    />
+                    <button
+                      type="submit"
+                      disabled={notifySubmitting}
+                      className="btn-luxury text-xs px-4 py-2.5 flex items-center justify-center gap-2 whitespace-nowrap"
+                    >
+                      <Bell className="w-3.5 h-3.5" />
+                      <span>{notifySubmitting ? 'جاري التسجيل...' : 'أعلمني عند التوفر'}</span>
+                    </button>
+                  </div>
+                  {notifyError && (
+                    <p className="text-[11px] text-red-600 text-right">{notifyError}</p>
+                  )}
+                </form>
+              )}
+
+              <div className="pt-2 border-t border-[#E5E0D5]/60">
+                <Link
+                  href="/products"
+                  className="btn-luxury-outline text-xs px-5 py-2 inline-flex items-center gap-2"
+                >
+                  <span>استكشف العطور المتوفرة حالياً</span>
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="space-y-4 pt-1">
