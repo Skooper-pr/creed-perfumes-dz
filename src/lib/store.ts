@@ -7,6 +7,7 @@ const PRODUCTS_KEY = 'creed_perfumes_products';
 const CATEGORIES_KEY = 'creed_perfumes_categories';
 const ORDERS_KEY = 'creed_perfumes_orders';
 const COUPONS_KEY = 'creed_perfumes_coupons';
+const BLOCKED_PHONES_KEY = 'creed_blocked_phones';
 
 // Event notification helper for live UI reactivity
 export function notifyDataChanged() {
@@ -392,6 +393,12 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'order_number' |
     stock_deducted: false,
     created_at: new Date().toISOString(),
   };
+
+  // (4d) Check blacklist for repeat no-show phone numbers
+  const isBlocked = await isPhoneBlocked(orderData.phone);
+  if (isBlocked) {
+    throw new Error('عذراً، هذا الرقم محظور من تسجيل طلبيات جديدة بسبب عدم استلام أو إلغاء طلبيات سابقة.');
+  }
 
   // (2e) Revalidate stock right before order submission
   if (isSupabaseConfigured() && supabase) {
@@ -781,5 +788,84 @@ export async function deleteCoupon(id: string): Promise<boolean> {
   notifyDataChanged();
   return true;
 }
+
+// -------------------- PHONE BLACKLIST (ANTI-FRAUD) --------------------
+export async function isPhoneBlocked(phone: string): Promise<boolean> {
+  const clean = phone.trim().replace(/[\s-]/g, '');
+  if (!clean) return false;
+
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      const { data } = await supabase
+        .from('blocked_phones')
+        .select('phone')
+        .eq('phone', clean)
+        .single();
+      if (data?.phone) return true;
+    } catch {
+      // ignore
+    }
+  }
+
+  const localBlocked = getLocal<string[]>(BLOCKED_PHONES_KEY, []);
+  return localBlocked.includes(clean);
+}
+
+export async function getBlockedPhones(): Promise<string[]> {
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      const { data } = await supabase.from('blocked_phones').select('phone');
+      if (data) {
+        const list = data.map((d: any) => d.phone);
+        setLocal(BLOCKED_PHONES_KEY, list);
+        return list;
+      }
+    } catch (e) {
+      console.warn('Falling back to local blocked phones:', e);
+    }
+  }
+  return getLocal<string[]>(BLOCKED_PHONES_KEY, []);
+}
+
+export async function blockPhone(phone: string, reason = 'عدم الرد أو رفض الاستلام'): Promise<boolean> {
+  const clean = phone.trim().replace(/[\s-]/g, '');
+  if (!clean) return false;
+
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      await supabase.from('blocked_phones').upsert({ phone: clean, reason });
+    } catch (e) {
+      console.warn('Supabase block phone error:', e);
+    }
+  }
+
+  const list = getLocal<string[]>(BLOCKED_PHONES_KEY, []);
+  if (!list.includes(clean)) {
+    list.push(clean);
+    setLocal(BLOCKED_PHONES_KEY, list);
+    notifyDataChanged();
+  }
+  return true;
+}
+
+export async function unblockPhone(phone: string): Promise<boolean> {
+  const clean = phone.trim().replace(/[\s-]/g, '');
+  if (!clean) return false;
+
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      await supabase.from('blocked_phones').delete().eq('phone', clean);
+    } catch (e) {
+      console.warn('Supabase unblock phone error:', e);
+    }
+  }
+
+  const list = getLocal<string[]>(BLOCKED_PHONES_KEY, []);
+  const filtered = list.filter((p) => p !== clean);
+  setLocal(BLOCKED_PHONES_KEY, filtered);
+  notifyDataChanged();
+  return true;
+}
+
 
 

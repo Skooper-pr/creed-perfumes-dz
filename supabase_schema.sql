@@ -494,4 +494,27 @@ INSERT INTO public.coupons (id, code, discount_type, discount_value, min_order_a
 VALUES ('cpn-welcome10', 'CREED10', 'percentage', 10, 10000, true)
 ON CONFLICT (code) DO NOTHING;
 
+-- 13. Blocked Phones (Blacklist for repeat no-shows)
+CREATE TABLE IF NOT EXISTS public.blocked_phones (
+    phone TEXT PRIMARY KEY,
+    reason TEXT DEFAULT 'عدم الرد أو رفض الاستلام المتكرر',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+ALTER TABLE public.blocked_phones ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public check blocked phones" ON public.blocked_phones;
+CREATE POLICY "Public check blocked phones"
+    ON public.blocked_phones FOR SELECT
+    TO anon, authenticated
+    USING (true);
+
+DROP POLICY IF EXISTS "Admin manage blocked phones" ON public.blocked_phones;
+CREATE POLICY "Admin manage blocked phones"
+    ON public.blocked_phones FOR ALL
+    TO authenticated
+    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
+    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
+
+
 

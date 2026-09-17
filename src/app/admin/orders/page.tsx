@@ -23,9 +23,10 @@ import {
   Send,
   Printer,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  ShieldAlert
 } from 'lucide-react';
-import { getOrders, updateOrderStatus, deleteOrder, subscribeToStoreChanges } from '@/lib/store';
+import { getOrders, updateOrderStatus, deleteOrder, subscribeToStoreChanges, blockPhone, unblockPhone, getBlockedPhones } from '@/lib/store';
 import { exportOrdersToExcel } from '@/lib/exportOrders';
 import { 
   dispatchOrderToDelivery, 
@@ -47,15 +48,38 @@ export default function AdminOrdersPage() {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
   const [selectedDispatchCompany, setSelectedDispatchCompany] = useState<DeliveryProvider>('yalidine');
+  const [blockedPhones, setBlockedPhones] = useState<string[]>([]);
 
   const loadOrders = async () => {
     try {
-      const data = await getOrders();
+      const [data, blocked] = await Promise.all([getOrders(), getBlockedPhones()]);
       setOrders(data);
+      setBlockedPhones(blocked);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleBlockPhone = async (phone: string) => {
+    const clean = phone.trim().replace(/[\s-]/g, '');
+    const isCurrentlyBlocked = blockedPhones.includes(clean);
+
+    if (isCurrentlyBlocked) {
+      if (confirm(`هل تريد إلغاء حظر الرقم (${phone})؟`)) {
+        await unblockPhone(clean);
+        setBlockedPhones((prev) => prev.filter((p) => p !== clean));
+        setStatusNotice(`تم إلغاء حظر الرقم (${phone}) بنجاح.`);
+        setTimeout(() => setStatusNotice(null), 4000);
+      }
+    } else {
+      if (confirm(`هل أنت متأكد من حظر الرقم (${phone}) ومنعه من تقديم أي طلبيات مستقبلاً؟`)) {
+        await blockPhone(clean, 'عدم الرد أو رفض استلام الطلب من لوحة الإدارة');
+        setBlockedPhones((prev) => [...prev, clean]);
+        setStatusNotice(`🚫 تم حظر الرقم (${phone}) وإضافته للقائمة السوداء.`);
+        setTimeout(() => setStatusNotice(null), 4000);
+      }
     }
   };
 
@@ -594,16 +618,43 @@ export default function AdminOrdersPage() {
 
             {/* Customer Details */}
             <div className="bg-surface-container-low p-4 rounded-2xl space-y-3 text-xs">
-              <div className="flex items-center justify-between">
+              {blockedPhones.includes(activeOrder.phone.replace(/[\s-]/g, '')) && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs font-bold flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 shrink-0" />
+                  <span>تنبيه: هذا الرقم مدرج في القائمة السوداء (محظور من تأكيد طلبيات جديدة).</span>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-bold text-on-surface text-sm">{activeOrder.customer_name}</span>
-                {/* One touch call button */}
-                <a
-                  href={`tel:${activeOrder.phone}`}
-                  className="btn-pill bg-emerald-600 text-white py-1.5 px-3 text-xs font-bold flex items-center gap-1 shadow-sm"
-                >
-                  <Phone className="w-3 h-3" />
-                  <span>اتصال الآن ({activeOrder.phone})</span>
-                </a>
+                <div className="flex items-center gap-2">
+                  {/* One touch call button */}
+                  <a
+                    href={`tel:${activeOrder.phone}`}
+                    className="btn-pill bg-emerald-600 text-white py-1.5 px-3 text-xs font-bold flex items-center gap-1 shadow-sm"
+                  >
+                    <Phone className="w-3 h-3" />
+                    <span>اتصال ({activeOrder.phone})</span>
+                  </a>
+
+                  {/* Block / Unblock phone button */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleBlockPhone(activeOrder.phone)}
+                    className={`btn-pill py-1.5 px-3 text-xs font-bold flex items-center gap-1 transition-colors ${
+                      blockedPhones.includes(activeOrder.phone.replace(/[\s-]/g, ''))
+                        ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
+                        : 'bg-red-100 text-red-800 hover:bg-red-200'
+                    }`}
+                  >
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    <span>
+                      {blockedPhones.includes(activeOrder.phone.replace(/[\s-]/g, ''))
+                        ? 'إلغاء الحظر'
+                        : 'حظر هذا الرقم'}
+                    </span>
+                  </button>
+                </div>
               </div>
 
               {activeOrder.phone_secondary && (
