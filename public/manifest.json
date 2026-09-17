@@ -1,0 +1,21 @@
+{
+  "name": "Creed Perfumes الجزائر",
+  "short_name": "Creed DZ",
+  "description": "بوتيك عطور دار Creed الفاخرة لزبائن الجزائر مع خدمة التوصيل لكافة الـ 58 ولاية والدفع عند الاستلام",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0b0d",
+  "theme_color": "#121215",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

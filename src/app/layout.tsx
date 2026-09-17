@@ -64,6 +64,15 @@ export const metadata: Metadata = {
   alternates: {
     canonical: siteConfig.url,
   },
+  manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/icon.png', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-icon.png' },
+    ],
+  },
 };
 
 export default function RootLayout({
