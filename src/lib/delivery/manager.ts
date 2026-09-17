@@ -298,35 +298,35 @@ export async function dispatchOrderToDelivery(
     .map(i => `${i.name} x${i.qty}`)
     .join(', ');
 
-  // 1. If Yalidine API credentials exist, attempt real API call
-  if (provider === 'yalidine' && settings.yalidine_api_id && settings.yalidine_api_token) {
+  // 1. If Yalidine API credentials exist or proxy is available, attempt server-side proxy call
+  if (provider === 'yalidine') {
     try {
-      const response = await fetch('https://api.yalidine.app/v1/parcels/', {
+      const response = await fetch('/api/delivery-proxy', {
         method: 'POST',
-        headers: {
-          'X-API-ID': settings.yalidine_api_id.trim(),
-          'X-API-TOKEN': settings.yalidine_api_token.trim(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify([
-          {
-            order_id: order.order_number,
-            firstname: firstName,
-            familyname: familyName,
-            contact_phone: order.phone,
-            address: order.address,
-            to_commune_name: order.commune,
-            to_wilaya_name: order.wilaya.replace(/^[0-9]+\s*-\s*/, '').trim(),
-            product_list: itemsDescription || 'عطور Creed أصلية فاخرة',
-            price: Number(order.total_price),
-            freeshipping: false,
-            is_stopdesk: settings.default_delivery_type === 'desk',
-            has_exchange: false,
-          },
-        ]),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'yalidine',
+          action: 'dispatch',
+          payload: [
+            {
+              order_id: order.order_number,
+              firstname: firstName,
+              familyname: familyName,
+              contact_phone: order.phone,
+              address: order.address,
+              to_commune_name: order.commune,
+              to_wilaya_name: order.wilaya.replace(/^[0-9]+\s*-\s*/, '').trim(),
+              product_list: itemsDescription || 'عطور Creed أصلية فاخرة',
+              price: Number(order.total_price),
+              freeshipping: false,
+              is_stopdesk: settings.default_delivery_type === 'desk',
+              has_exchange: false,
+            },
+          ],
+        }),
       });
 
-      if (response.ok) {
+      if (response && response.ok) {
         const json = await response.json();
         const parcelData = json[order.order_number] || Object.values(json)[0] as any;
         if (parcelData && parcelData.tracking) {
@@ -355,7 +355,7 @@ export async function dispatchOrderToDelivery(
         }
       }
     } catch (apiErr) {
-      console.warn('Real Yalidine API call error, falling back to smart simulation:', apiErr);
+      console.warn('Server delivery proxy call error, falling back to smart simulation:', apiErr);
     }
   }
 
@@ -414,17 +414,20 @@ export async function syncDeliveryTracking(order: Order): Promise<{
   const provider = order.delivery_provider || settings.provider || 'yalidine';
   const company = DELIVERY_COMPANIES[provider] || DELIVERY_COMPANIES.yalidine;
 
-  // 1. If real Yalidine keys exist, query real tracking API
-  if (provider === 'yalidine' && settings.yalidine_api_id && settings.yalidine_api_token) {
+  // 1. If Yalidine tracking is needed, query via server-side delivery proxy
+  if (provider === 'yalidine') {
     try {
-      const response = await fetch(`https://api.yalidine.app/v1/histories/?tracking=${order.tracking_number}`, {
-        headers: {
-          'X-API-ID': settings.yalidine_api_id.trim(),
-          'X-API-TOKEN': settings.yalidine_api_token.trim(),
-        },
+      const response = await fetch('/api/delivery-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'yalidine',
+          action: 'track',
+          payload: { tracking: order.tracking_number },
+        }),
       });
 
-      if (response.ok) {
+      if (response && response.ok) {
         const histories = await response.json();
         const latest = Array.isArray(histories) ? histories[histories.length - 1] : histories.data?.[0];
         if (latest && latest.status) {
@@ -450,7 +453,7 @@ export async function syncDeliveryTracking(order: Order): Promise<{
         }
       }
     } catch (e) {
-      console.warn('Yalidine live tracking check error, falling back to smart tracker:', e);
+      console.warn('Server delivery proxy tracking check error, falling back to smart tracker:', e);
     }
   }
 

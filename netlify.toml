@@ -17,3 +17,9 @@
   from = "/api/telegram-webhook"
   to = "/.netlify/functions/telegram-webhook"
   status = 200
+
+# Delivery Proxy Endpoint (server-side courier calls)
+[[redirects]]
+  from = "/api/delivery-proxy"
+  to = "/.netlify/functions/delivery-proxy"
+  status = 200
