@@ -42,6 +42,9 @@ export default function ProductDetailClient() {
         const item = await getProductBySlug(slug);
         setProduct(item);
         if (item) {
+          // Update document.title client-side so the tab matches the real product
+          const activePrice = item.discount_price ?? item.price;
+          document.title = `${item.name} (${item.size || '100ml'}) - ${activePrice.toLocaleString('ar-DZ')} دج | Creed Perfumes الجزائر`;
           const all = await getProducts();
           setRelatedProducts(all.filter((p) => p.id !== item.id).slice(0, 4));
         }
