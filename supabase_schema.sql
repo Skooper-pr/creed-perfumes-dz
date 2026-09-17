@@ -153,12 +153,13 @@ CREATE POLICY "Admin manage orders"
 CREATE POLICY "Allow admin all on settings"
     ON public.admin_settings FOR ALL
     TO authenticated
-    USING (true)
-    WITH CHECK (true);
+    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
+    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
 
 -- 7. Functions & Triggers
 
 -- Trigger: Verify & Recalculate Order Total (Prevents client-side price tampering)
+-- Also enforces phone-based throttle (1d) and generates unique order numbers (2d)
 CREATE OR REPLACE FUNCTION public.verify_and_recalc_order_total()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -168,6 +169,7 @@ DECLARE
     calculated_subtotal NUMERIC(12, 2) := 0;
     item_price NUMERIC(12, 2);
     item_qty INT;
+    v_recent_count INT;
 BEGIN
     IF jsonb_typeof(NEW.items) != 'array' OR jsonb_array_length(NEW.items) < 1 THEN
         RAISE EXCEPTION 'Order must contain at least one item.';
@@ -189,9 +191,24 @@ BEGIN
     -- Enforce total_price server-side
     NEW.total_price := calculated_subtotal + NEW.delivery_fee;
 
+    -- (1d) Phone-based throttle: reject if same phone ordered within last 2 minutes
+    SELECT count(*) INTO v_recent_count
+    FROM public.orders
+    WHERE phone = NEW.phone
+      AND created_at > (now() - interval '2 minutes');
+    IF v_recent_count > 0 THEN
+        RAISE EXCEPTION 'تم تسجيل طلبية من هذا الرقم مؤخراً. يرجى الانتظار دقيقتين.';
+    END IF;
+
+    -- (2d) Generate collision-free order number from Postgres sequence
+    NEW.order_number := 'DZ-' || nextval('creed_order_seq')::text;
+
     RETURN NEW;
 END;
 $$;
+
+-- Sequence for unique order numbers (starts at 10000 to keep the 5-digit pattern)
+CREATE SEQUENCE IF NOT EXISTS creed_order_seq START WITH 10000 INCREMENT BY 1;
 
 DROP TRIGGER IF EXISTS trg_verify_order_total ON public.orders;
 CREATE TRIGGER trg_verify_order_total
@@ -260,6 +277,8 @@ $$;
 GRANT EXECUTE ON FUNCTION public.adjust_product_stock(text, int) TO anon, authenticated;
 
 -- RPC: Update Order Status from Telegram Bot (Authorized via Secret)
+-- The secret is stored via: ALTER DATABASE postgres SET app.telegram_bot_secret = 'your-secret-here';
+-- This must match the TELEGRAM_BOT_SECRET env var in the Netlify function.
 CREATE OR REPLACE FUNCTION public.update_order_status_via_bot(
     p_order_id text,
     p_status order_status_type,
@@ -272,8 +291,17 @@ SET search_path = public
 AS $$
 DECLARE
     v_order public.orders%ROWTYPE;
+    v_stored_secret text;
 BEGIN
-    IF p_secret IS NULL OR length(p_secret) < 10 THEN
+    -- Retrieve the real secret stored in the database configuration
+    v_stored_secret := current_setting('app.telegram_bot_secret', true);
+
+    -- Reject if no secret is configured or if it doesn't match
+    IF v_stored_secret IS NULL OR v_stored_secret = '' THEN
+        RAISE EXCEPTION 'Server misconfiguration: app.telegram_bot_secret is not set';
+    END IF;
+
+    IF p_secret IS DISTINCT FROM v_stored_secret THEN
         RAISE EXCEPTION 'Unauthorized: invalid bot secret';
     END IF;
 
@@ -330,6 +358,9 @@ INSERT INTO public.categories (id, name, slug, icon) VALUES
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug;
 
 -- 10. Seed Initial Iconic Creed Perfumes
+-- TODO: The product images below are prototype placeholder URLs (lh3.googleusercontent.com).
+-- They need to be re-uploaded as real product photos through the admin panel's existing
+-- image upload flow, which stores them in the 'perfume-images' Supabase Storage bucket.
 INSERT INTO public.products (
     id, name, slug, description, price, discount_price, images, category_id, category_name, brand, stock, is_featured, concentration, size, fragrance_notes
 ) VALUES
