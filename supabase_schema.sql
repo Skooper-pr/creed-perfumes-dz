@@ -734,6 +734,6 @@ BEGIN
 END;
 $$;
 REVOKE ALL ON FUNCTION public.check_request() FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.check_request() TO authenticator;
+GRANT EXECUTE ON FUNCTION public.check_request() TO anon, authenticated, authenticator;
 ALTER ROLE authenticator SET pgrst.db_pre_request = 'public.check_request';
 NOTIFY pgrst, 'reload config';
