@@ -67,4 +67,32 @@ export const handler = async (event: { httpMethod?: string }) => {
 
     // 3. Send to all configured admins
     const adminChatIds = getAuthorizedAdminIds();
-    const sendResults: Record<string, bo
+    const sendResults: Record<string, boolean> = {};
+
+    if (adminChatIds.length === 0) {
+      console.warn('No TELEGRAM_ADMIN_CHAT_IDS configured for daily digest');
+    }
+
+    for (const chatId of adminChatIds) {
+      const res = await sendTelegramMessage(chatId, message);
+      sendResults[chatId] = Boolean(res?.ok);
+    }
+
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ok: true,
+        stats,
+        recipients_count: adminChatIds.length,
+        delivery: sendResults,
+      }),
+    };
+  } catch (err: any) {
+    console.error('Fatal error in daily digest:', err);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'Internal server error', details: err?.message }),
+    };
+  }
+};

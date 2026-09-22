@@ -681,4 +681,248 @@ export async function validateCoupon(
   }
 
   if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
-    return { valid: false, discount: 0, error: 'هذا الكوبون منتهي الصلاحية' 
+    return { valid: false, discount: 0, error: 'هذا الكوبون منتهي الصلاحية' };
+  }
+
+  if (coupon.max_uses && coupon.used_count >= coupon.max_uses) {
+    return { valid: false, discount: 0, error: 'تم استنفاد الحد الأقصى لاستخدام هذا الكوبون' };
+  }
+
+  if (coupon.min_order_amount && subtotal < coupon.min_order_amount) {
+    return {
+      valid: false,
+      discount: 0,
+      error: `الحد الأدنى لقيمة الطلب لتفعيل هذا الكوبون هو ${coupon.min_order_amount.toLocaleString('ar-DZ')} دج`,
+    };
+  }
+
+  let discount = 0;
+  if (coupon.discount_type === 'percentage') {
+    discount = Math.round((subtotal * coupon.discount_value) / 100);
+  } else {
+    discount = Math.min(subtotal, coupon.discount_value);
+  }
+
+  return { valid: true, discount, coupon };
+}
+
+export async function saveCoupon(coupon: Partial<Coupon> & { code: string; discount_value: number }): Promise<Coupon> {
+  const newCoupon: Coupon = {
+    id: coupon.id || `cpn-${Date.now()}`,
+    code: coupon.code.trim().toUpperCase(),
+    discount_type: coupon.discount_type || 'percentage',
+    discount_value: Number(coupon.discount_value),
+    min_order_amount: coupon.min_order_amount ? Number(coupon.min_order_amount) : 0,
+    max_uses: coupon.max_uses ? Number(coupon.max_uses) : null,
+    used_count: coupon.used_count || 0,
+    is_active: coupon.is_active !== undefined ? coupon.is_active : true,
+    expires_at: coupon.expires_at || null,
+    created_at: coupon.created_at || new Date().toISOString(),
+  };
+
+  if (isSupabaseConfigured() && supabase) {
+    const { data, error } = await supabase.from('coupons').upsert(newCoupon).select().single();
+    if (error) {
+      console.error('Supabase saveCoupon error:', error);
+      throw new Error(`تعذر حفظ الكوبون: ${error.message}`);
+    }
+    if (data) {
+      const coupons = getLocal<Coupon[]>(COUPONS_KEY, INITIAL_COUPONS);
+      const idx = coupons.findIndex((c) => c.id === data.id);
+      if (idx >= 0) coupons[idx] = data as Coupon;
+      else coupons.unshift(data as Coupon);
+      setLocal(COUPONS_KEY, coupons);
+      notifyDataChanged();
+      return data as Coupon;
+    }
+  }
+
+  const coupons = getLocal<Coupon[]>(COUPONS_KEY, INITIAL_COUPONS);
+  const idx = coupons.findIndex((c) => c.id === newCoupon.id);
+  if (idx >= 0) coupons[idx] = newCoupon;
+  else coupons.unshift(newCoupon);
+  setLocal(COUPONS_KEY, coupons);
+  notifyDataChanged();
+  return newCoupon;
+}
+
+export async function deleteCoupon(id: string): Promise<boolean> {
+  if (isSupabaseConfigured() && supabase) {
+    const { error } = await supabase.from('coupons').delete().eq('id', id);
+    if (error) {
+      console.error('Supabase deleteCoupon error:', error);
+      throw new Error(`تعذر حذف الكوبون: ${error.message}`);
+    }
+  }
+  const coupons = getLocal<Coupon[]>(COUPONS_KEY, INITIAL_COUPONS);
+  setLocal(COUPONS_KEY, coupons.filter((c) => c.id !== id));
+  notifyDataChanged();
+  return true;
+}
+
+// -------------------- PHONE BLACKLIST (ANTI-FRAUD) --------------------
+export async function isPhoneBlocked(phone: string): Promise<boolean> {
+  const clean = phone.trim().replace(/[\s-]/g, '');
+  if (!clean) return false;
+
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      const { data } = await supabase
+        .from('blocked_phones')
+        .select('phone')
+        .eq('phone', clean)
+        .single();
+      if (data?.phone) return true;
+    } catch {
+      // ignore
+    }
+  }
+
+  const localBlocked = getLocal<string[]>(BLOCKED_PHONES_KEY, []);
+  return localBlocked.includes(clean);
+}
+
+export async function getBlockedPhones(): Promise<string[]> {
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      const { data } = await supabase.from('blocked_phones').select('phone');
+      if (data) {
+        const list = data.map((d: any) => d.phone);
+        setLocal(BLOCKED_PHONES_KEY, list);
+        return list;
+      }
+    } catch (e) {
+      console.warn('Falling back to local blocked phones:', e);
+    }
+  }
+  return getLocal<string[]>(BLOCKED_PHONES_KEY, []);
+}
+
+export async function blockPhone(phone: string, reason = 'عدم الرد أو رفض الاستلام'): Promise<boolean> {
+  const clean = phone.trim().replace(/[\s-]/g, '');
+  if (!clean) return false;
+
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      await supabase.from('blocked_phones').upsert({ phone: clean, reason });
+    } catch (e) {
+      console.warn('Supabase block phone error:', e);
+    }
+  }
+
+  const list = getLocal<string[]>(BLOCKED_PHONES_KEY, []);
+  if (!list.includes(clean)) {
+    list.push(clean);
+    setLocal(BLOCKED_PHONES_KEY, list);
+    notifyDataChanged();
+  }
+  return true;
+}
+
+export async function unblockPhone(phone: string): Promise<boolean> {
+  const clean = phone.trim().replace(/[\s-]/g, '');
+  if (!clean) return false;
+
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      await supabase.from('blocked_phones').delete().eq('phone', clean);
+    } catch (e) {
+      console.warn('Supabase unblock phone error:', e);
+    }
+  }
+
+  const list = getLocal<string[]>(BLOCKED_PHONES_KEY, []);
+  const filtered = list.filter((p) => p !== clean);
+  setLocal(BLOCKED_PHONES_KEY, filtered);
+  notifyDataChanged();
+  return true;
+}
+
+// -------------------- BUNDLES & GIFT SETS --------------------
+export async function getBundles(activeOnly = false): Promise<Bundle[]> {
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      let query = supabase.from('bundles').select('*').order('created_at', { ascending: false });
+      if (activeOnly) {
+        query = query.eq('is_active', true);
+      }
+      const { data, error } = await query;
+      if (!error && data) {
+        const bundles = data.map((b: any) => ({
+          ...b,
+          product_ids: Array.isArray(b.product_ids) ? b.product_ids : (typeof b.product_ids === 'string' ? JSON.parse(b.product_ids) : []),
+        })) as Bundle[];
+        setLocal(BUNDLES_KEY, bundles);
+        return bundles;
+      }
+    } catch (e) {
+      console.warn('Falling back to local bundles:', e);
+    }
+  }
+  const local = getLocal<Bundle[]>(BUNDLES_KEY, INITIAL_BUNDLES);
+  return activeOnly ? local.filter(b => b.is_active) : local;
+}
+
+export async function saveBundle(bundleData: Omit<Bundle, 'id' | 'created_at'> & { id?: string }): Promise<Bundle> {
+  const id = bundleData.id || `bundle-${Date.now()}`;
+  let slug = bundleData.slug?.trim();
+  if (!slug) {
+    slug = `bundle-${Date.now()}`;
+  }
+
+  const bundle: Bundle = {
+    ...bundleData,
+    id,
+    slug,
+    created_at: new Date().toISOString(),
+  };
+
+  if (isSupabaseConfigured() && supabase) {
+    const { error } = await supabase.from('bundles').upsert({
+      id: bundle.id,
+      name: bundle.name,
+      slug: bundle.slug,
+      description: bundle.description,
+      badge_label: bundle.badge_label || 'مجموعة خاصة',
+      price: bundle.price,
+      discount_price: bundle.discount_price,
+      product_ids: bundle.product_ids,
+      image: bundle.image || '',
+      is_active: bundle.is_active,
+    });
+    if (error) {
+      console.error('Supabase saveBundle error:', error);
+      throw new Error(`تعذر حفظ المجموعة: ${error.message}`);
+    }
+  }
+
+  const list = getLocal<Bundle[]>(BUNDLES_KEY, INITIAL_BUNDLES);
+  const idx = list.findIndex(b => b.id === id);
+  if (idx >= 0) {
+    list[idx] = bundle;
+  } else {
+    list.unshift(bundle);
+  }
+  setLocal(BUNDLES_KEY, list);
+  triggerNetlifyRebuild();
+  notifyDataChanged();
+  return bundle;
+}
+
+export async function deleteBundle(id: string): Promise<boolean> {
+  if (isSupabaseConfigured() && supabase) {
+    const { error } = await supabase.from('bundles').delete().eq('id', id);
+    if (error) {
+      console.error('Supabase deleteBundle error:', error);
+      throw new Error(`تعذر حذف المجموعة: ${error.message}`);
+    }
+  }
+  const list = getLocal<Bundle[]>(BUNDLES_KEY, INITIAL_BUNDLES);
+  setLocal(BUNDLES_KEY, list.filter(b => b.id !== id));
+  triggerNetlifyRebuild();
+  notifyDataChanged();
+  return true;
+}
+
+
+

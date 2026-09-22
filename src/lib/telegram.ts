@@ -5,4 +5,9 @@ export async function sendTelegramOrderNotification(orderId: string): Promise<vo
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderId }),
-      kee
+      keepalive: true,
+    });
+  } catch (error) {
+    console.warn('Order notification could not be queued:', error);
+  }
+}

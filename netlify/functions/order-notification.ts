@@ -75,3 +75,34 @@ ${itemLines}
         [
           { text: '✅ تأكيد الطلب', callback_data: `act:confirmed:${order.id}` },
           { text: '🚚 تم الشحن', callback_data: `act:shipped:${order.id}` },
+        ],
+        [
+          { text: '📦 تم التسليم', callback_data: `act:delivered:${order.id}` },
+          { text: '🔄 طرد راجع', callback_data: `act:returned:${order.id}` },
+        ],
+        [
+          { text: '❌ إلغاء الطلب', callback_data: `act:cancelled:${order.id}` },
+          { text: '💬 واتساب الزبون', url: `https://wa.me/${whatsappPhone}` },
+        ],
+      ],
+    };
+
+    const results = await Promise.all(chatIds.map(async (chatId) => {
+      const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML', reply_markup: replyMarkup, disable_web_page_preview: true }),
+      });
+      return response.ok;
+    }));
+
+    if (!results.some(Boolean)) {
+      await supabase.from('telegram_notified_orders').delete().eq('order_id', orderId);
+      return { statusCode: 502, headers, body: JSON.stringify({ error: 'Telegram notification failed' }) };
+    }
+    return { statusCode: 202, headers, body: JSON.stringify({ ok: true }) };
+  } catch (error) {
+    console.error('Order notification failed:', error);
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Order notification failed' }) };
+  }
+};

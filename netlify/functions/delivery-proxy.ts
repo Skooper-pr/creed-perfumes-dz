@@ -99,4 +99,43 @@ export const handler = async (event: { httpMethod: string; headers?: Record<stri
       }
 
       if (action === 'track') {
-   
+        const tracking = payload?.tracking;
+        if (!tracking) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: 'Missing tracking number in payload' }),
+          };
+        }
+
+        const response = await fetch(`https://api.yalidine.app/v1/histories/?tracking=${encodeURIComponent(tracking)}`, {
+          headers: {
+            'X-API-ID': apiId,
+            'X-API-TOKEN': apiToken,
+          },
+        });
+
+        const data = await response.json();
+        return {
+          statusCode: response.status,
+          headers,
+          body: JSON.stringify(data),
+        };
+      }
+    }
+
+    // Default response if provider does not have a live server API implementation
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: `Provider '${provider}' or action '${action}' not supported for direct proxy` }),
+    };
+  } catch (error: any) {
+    console.error('delivery-proxy error:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: error.message || 'Internal server error' }),
+    };
+  }
+};

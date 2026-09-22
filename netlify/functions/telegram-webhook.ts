@@ -238,4 +238,87 @@ export const handler = async (event: { httpMethod: string; headers?: Record<stri
         if (!pendingOrders || pendingOrders.length === 0) {
           await callTelegram('sendMessage', {
             chat_id: chatId,
-          
+            text: '✨ لا توجد حالياً أي طلبيات معلقة بانتظار التأكيد! كل الطلبات تمت معالجتها.',
+          });
+        } else {
+          await callTelegram('sendMessage', {
+            chat_id: chatId,
+            text: `📋 *توجد ${pendingOrders.length} طلبيات بانتظار التأكيد:*`,
+            parse_mode: 'Markdown',
+          });
+
+          for (const ord of pendingOrders) {
+            const cleanPhone = (ord.phone || '').replace(/[\s\-\+]/g, '');
+            const waPhone = cleanPhone.startsWith('0')
+              ? '213' + cleanPhone.slice(1)
+              : cleanPhone.startsWith('213')
+              ? cleanPhone
+              : '213' + cleanPhone;
+
+            await callTelegram('sendMessage', {
+              chat_id: chatId,
+              text: `📦 *طلب رقم:* \`#${ord.order_number}\`
+👤 *الزبون:* ${ord.customer_name}
+📞 *الهاتف:* ${ord.phone}
+📍 *الولاية:* ${ord.wilaya} (${ord.commune})
+💰 *المبلغ:* *${Number(ord.total_price).toLocaleString('ar-DZ')} دج*`,
+              parse_mode: 'Markdown',
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    { text: '✅ تأكيد الطلب', callback_data: `act:confirmed:${ord.id}` },
+                    { text: '🚚 تم الشحن', callback_data: `act:shipped:${ord.id}` },
+                  ],
+                  [
+                    { text: '❌ إلغاء الطلب', callback_data: `act:cancelled:${ord.id}` },
+                    { text: '💬 مراسلة واتساب', url: `https://wa.me/${waPhone}` },
+                  ],
+                ],
+              },
+            });
+          }
+        }
+      } else if (text.startsWith('/stats')) {
+        const { data: allOrders } = await supabase
+          .from('orders')
+          .select('*');
+
+        const stats = calculateSalesStats(allOrders || []);
+        const statsMessage = formatDailyDigestMessage(stats);
+
+        await callTelegram('sendMessage', {
+          chat_id: chatId,
+          text: statsMessage,
+          parse_mode: 'Markdown',
+        });
+      } else if (text.startsWith('/help')) {
+        await callTelegram('sendMessage', {
+          chat_id: chatId,
+          text: `ℹ️ *دليل الاستخدام وإضافة شركاء أو مدراء:*
+
+1. *كيف يشارك أكثر من شخص في إدارة الطلبات؟*
+   • يمكنك إنشاء مجموعة تيليجرام خاصة (Private Group).
+   • أضف إليها شريكك أو موظفيك.
+   • أضف البوت \`@creed_dz_orders_bot\` إلى المجموعة.
+   • اكتب في المجموعة \`/start\` وستصل كل الطلبيات هناك ويمكن لأي شخص الضغط على الأزرار!
+
+2. *حماية البوت:*
+   • البوت يرفض أي شخص غريب لا يتواجد في قائمة المدراء المعتمدة.`,
+          parse_mode: 'Markdown',
+        });
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ok: true }),
+    };
+  } catch (err) {
+    console.error('Webhook execution error:', err);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'Internal server error' }),
+    };
+  }
+};

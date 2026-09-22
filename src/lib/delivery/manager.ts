@@ -553,4 +553,207 @@ export function openPrintableShippingLabel(order: Order): void {
 
   const printWindow = window.open('', '_blank', 'width=800,height=900');
   if (!printWindow) {
-    alert('يرجى السماح بالنوافذ المنبثقة لطباعة ب�
+    alert('يرجى السماح بالنوافذ المنبثقة لطباعة بوليصة الشحن.');
+    return;
+  }
+
+  const safeCustomerName = escapeHtml(order.customer_name);
+  const safePhone = escapeHtml(order.phone);
+  const safePhoneSecondary = escapeHtml(order.phone_secondary);
+  const safeWilaya = escapeHtml(order.wilaya);
+  const safeCommune = escapeHtml(order.commune);
+  const safeAddress = escapeHtml(order.address);
+  const safeNotes = escapeHtml(order.notes);
+  const safeOrderNumber = escapeHtml(order.order_number);
+  const safeTrackingNumber = escapeHtml(trackingNumber);
+  const safeSenderName = escapeHtml(settings.sender_name);
+  const safeSenderPhone = escapeHtml(settings.sender_phone);
+  const safeSenderWilaya = escapeHtml(settings.sender_wilaya);
+  const safeSenderCommune = escapeHtml(settings.sender_commune);
+  const safeSenderAddress = escapeHtml(settings.sender_address);
+
+  const itemsHtml = (order.items || [])
+    .map(i => `<tr>
+      <td style="padding: 6px 10px; border-bottom: 1px solid #eee;">${escapeHtml(i.name)}</td>
+      <td style="padding: 6px 10px; border-bottom: 1px solid #eee; text-align: center;">${Number(i.qty) || 1}</td>
+      <td style="padding: 6px 10px; border-bottom: 1px solid #eee; text-align: left;">${(Number(i.price) || 0).toLocaleString('ar-DZ')} دج</td>
+    </tr>`)
+    .join('');
+
+  const html = `
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>بوليصة شحن - ${safeOrderNumber} - ${safeTrackingNumber}</title>
+  <style>
+    body {
+      font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+      margin: 0;
+      padding: 20px;
+      color: #111;
+      background: #fff;
+    }
+    .label-box {
+      max-width: 600px;
+      margin: 0 auto;
+      border: 3px dashed #333;
+      padding: 24px;
+      border-radius: 16px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #222;
+      padding-bottom: 14px;
+      margin-bottom: 16px;
+    }
+    .barcode {
+      font-family: 'Courier New', monospace;
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      background: #f4f4f4;
+      padding: 8px 16px;
+      border: 1px solid #ccc;
+      text-align: center;
+      margin: 10px 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .card {
+      background: #f9f9f9;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #eee;
+    }
+    .cod-box {
+      background: ${company.themeColor};
+      color: #fff;
+      padding: 14px;
+      border-radius: 12px;
+      text-align: center;
+      margin: 16px 0;
+    }
+    .fragile {
+      display: inline-block;
+      background: #fee2e2;
+      color: #dc2626;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th {
+      background: #eee;
+      padding: 8px;
+      text-align: right;
+    }
+    .no-print {
+      text-align: center;
+      margin-top: 20px;
+    }
+    @media print {
+      .no-print { display: none; }
+      body { padding: 0; }
+      .label-box { border: 2px solid #000; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="label-box">
+    <div class="header">
+      <div>
+        <h2 style="margin: 0; color: #541f91;">Creed Perfumes الجزائر</h2>
+        <span style="font-size: 12px; color: #666;">دار العطور الملكية • شحنة فاخرة</span>
+      </div>
+      <div style="text-align: left;">
+        <span style="display: block; font-weight: bold; font-size: 16px; color: ${company.themeColor};">${escapeHtml(company.name)} (${escapeHtml(company.name_ar)})</span>
+        <span style="font-size: 11px; color: #888;">Livraison Express 58 Wilayas • ${escapeHtml(company.coverage)}</span>
+      </div>
+    </div>
+
+    <div class="barcode">
+      |||| | |||||| || |||||| | ||||<br>
+      ${safeTrackingNumber}
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <strong style="font-size: 12px; color: #541f91; display: block; margin-bottom: 6px;">المرسل (Expéditeur):</strong>
+        <div style="font-size: 12px; line-height: 1.6;">
+          <strong>${safeSenderName}</strong><br>
+          ${safeSenderPhone}<br>
+          ${safeSenderWilaya} — ${safeSenderCommune}<br>
+          ${safeSenderAddress}
+        </div>
+      </div>
+
+      <div class="card" style="border: 2px solid ${company.themeColor};">
+        <strong style="font-size: 12px; color: ${company.themeColor}; display: block; margin-bottom: 6px;">المرسل إليه (Destinataire):</strong>
+        <div style="font-size: 13px; line-height: 1.6;">
+          <strong style="font-size: 15px;">${safeCustomerName}</strong><br>
+          <span style="font-weight: bold; color: #000; font-size: 14px;">📞 ${safePhone}</span>
+          ${safePhoneSecondary ? ` | ${safePhoneSecondary}` : ''}<br>
+          <strong>الولاية: ${safeWilaya}</strong><br>
+          البلدية: ${safeCommune}<br>
+          العنوان: ${safeAddress}
+        </div>
+      </div>
+    </div>
+
+    <div class="cod-box">
+      <span style="font-size: 12px; opacity: 0.9; display: block;">المبلغ الواجب تحصيله نقداً عند الاستلام (COD):</span>
+      <span style="font-size: 28px; font-weight: 900;">${order.total_price.toLocaleString('ar-DZ')} دج</span>
+      <div style="font-size: 11px; margin-top: 4px; opacity: 0.85;">(يشمل ثمن العطور + مصاريف التوصيل)</div>
+    </div>
+
+    <table style="margin-top: 10px;">
+      <thead>
+        <tr>
+          <th>العطر والحجم</th>
+          <th style="text-align: center;">الكمية</th>
+          <th style="text-align: left;">السعر</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsHtml}
+      </tbody>
+    </table>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
+      <span class="fragile">⚠️ عطور زجاجية فاخرة — قابل للكسر (Fragile)</span>
+      <span style="font-size: 11px; color: #666;">رقم الطلب الداخلي: ${safeOrderNumber}</span>
+    </div>
+
+    ${order.notes ? `
+    <div style="margin-top: 10px; background: #fffbe6; border: 1px solid #ffe58f; padding: 8px 12px; border-radius: 8px; font-size: 11px;">
+      <strong>ملاحظات الزبون:</strong> ${safeNotes}
+    </div>` : ''}
+  </div>
+
+  <div class="no-print">
+    <button onclick="window.print()" style="background: ${company.themeColor}; color: white; border: none; padding: 12px 28px; font-size: 14px; font-weight: bold; border-radius: 50px; cursor: pointer;">
+      🖨️ طباعة بوليصة الشحن (${escapeHtml(company.shortName)})
+    </button>
+  </div>
+
+</body>
+</html>
+  `;
+
+  printWindow.document.write(html);
+  printWindow.document.close();
+}

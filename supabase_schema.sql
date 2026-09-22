@@ -551,4 +551,189 @@ CREATE TABLE IF NOT EXISTS public.stock_notifications (
     id TEXT PRIMARY KEY DEFAULT ('notif-' || gen_random_uuid()),
     product_id TEXT NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
     product_name TEXT NOT NULL,
-    phone 
+    phone TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+ALTER TABLE public.stock_notifications ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.stock_notifications FROM PUBLIC, anon;
+GRANT INSERT ON TABLE public.stock_notifications TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.stock_notifications TO authenticated, service_role;
+
+DROP POLICY IF EXISTS "Allow public insert stock notifications" ON public.stock_notifications;
+CREATE POLICY "Allow public insert stock notifications"
+    ON public.stock_notifications FOR INSERT
+    TO anon, authenticated
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admin manage stock notifications" ON public.stock_notifications;
+CREATE POLICY "Admin manage stock notifications"
+    ON public.stock_notifications FOR ALL
+    TO authenticated
+    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
+    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
+
+-- 12. Coupons & Promo Codes
+CREATE TABLE IF NOT EXISTS public.coupons (
+    id TEXT PRIMARY KEY DEFAULT ('cpn-' || gen_random_uuid()),
+    code TEXT NOT NULL UNIQUE,
+    discount_type TEXT NOT NULL DEFAULT 'percentage', -- 'percentage' or 'fixed'
+    discount_value NUMERIC(10, 2) NOT NULL,
+    min_order_amount NUMERIC(10, 2) DEFAULT 0,
+    max_uses INT DEFAULT NULL,
+    used_count INT NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    expires_at TIMESTAMPTZ DEFAULT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+ALTER TABLE public.coupons ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.coupons FROM PUBLIC, anon;
+GRANT SELECT ON TABLE public.coupons TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.coupons TO authenticated, service_role;
+
+DROP POLICY IF EXISTS "Allow public select active coupons" ON public.coupons;
+CREATE POLICY "Allow public select active coupons"
+    ON public.coupons FOR SELECT
+    TO anon, authenticated
+    USING (is_active = true);
+
+DROP POLICY IF EXISTS "Admin manage coupons" ON public.coupons;
+CREATE POLICY "Admin manage coupons"
+    ON public.coupons FOR ALL
+    TO authenticated
+    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
+    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
+
+-- Add coupon columns to orders table
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS coupon_code TEXT DEFAULT NULL;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12, 2) DEFAULT 0;
+
+-- Initial Seed Coupon: WELCOME10 (10% off)
+INSERT INTO public.coupons (id, code, discount_type, discount_value, min_order_amount, is_active)
+VALUES ('cpn-welcome10', 'CREED10', 'percentage', 10, 10000, true)
+ON CONFLICT (code) DO NOTHING;
+
+-- 13. Blocked Phones (Blacklist for repeat no-shows)
+CREATE TABLE IF NOT EXISTS public.blocked_phones (
+    phone TEXT PRIMARY KEY,
+    reason TEXT DEFAULT 'عدم الرد أو رفض الاستلام المتكرر',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+ALTER TABLE public.blocked_phones ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.blocked_phones FROM PUBLIC, anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.blocked_phones TO authenticated, service_role;
+
+DROP POLICY IF EXISTS "Admin manage blocked phones" ON public.blocked_phones;
+CREATE POLICY "Admin manage blocked phones"
+    ON public.blocked_phones FOR ALL
+    TO authenticated
+    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
+    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
+
+-- 14. Product Bundles & Gift Sets (أطقم الهدايا والمجموعات الخاصة)
+CREATE TABLE IF NOT EXISTS public.bundles (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
+    description TEXT DEFAULT '',
+    badge_label TEXT DEFAULT 'مجموعة خاصة',
+    price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    discount_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    product_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+    image TEXT DEFAULT '',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+ALTER TABLE public.bundles ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.bundles FROM PUBLIC, anon;
+GRANT SELECT ON TABLE public.bundles TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.bundles TO authenticated, service_role;
+
+DROP POLICY IF EXISTS "Public select active bundles" ON public.bundles;
+CREATE POLICY "Public select active bundles"
+    ON public.bundles FOR SELECT
+    TO anon, authenticated
+    USING (is_active = true);
+
+DROP POLICY IF EXISTS "Admin manage bundles" ON public.bundles;
+CREATE POLICY "Admin manage bundles"
+    ON public.bundles FOR ALL
+    TO authenticated
+    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
+    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
+
+-- Per-IP write throttling for anonymous checkout and stock-notification writes.
+CREATE SCHEMA IF NOT EXISTS private;
+REVOKE ALL ON SCHEMA private FROM PUBLIC, anon, authenticated;
+CREATE TABLE IF NOT EXISTS private.order_request_limits (
+    client_ip INET PRIMARY KEY,
+    window_started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    request_count INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS order_request_limits_window_idx
+    ON private.order_request_limits(window_started_at);
+ALTER TABLE private.order_request_limits ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE private.order_request_limits FROM PUBLIC, anon, authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.check_request()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, private
+AS $$
+DECLARE
+    v_method TEXT := upper(coalesce(current_setting('request.method', true), ''));
+    v_role TEXT := coalesce(current_setting('request.jwt.claims', true)::jsonb->>'role', '');
+    v_path TEXT := trim(both '/' from coalesce(current_setting('request.path', true), ''));
+    v_headers jsonb := coalesce(current_setting('request.headers', true)::jsonb, '{}'::jsonb);
+    v_ip_text TEXT;
+    v_ip INET;
+    v_window_started_at TIMESTAMPTZ;
+    v_request_count INTEGER;
+    v_limit INTEGER;
+BEGIN
+    IF v_role <> 'anon' OR v_method NOT IN ('POST', 'PUT', 'PATCH', 'DELETE') THEN RETURN; END IF;
+    IF v_path = 'orders' THEN v_limit := 6;
+    ELSIF v_path = 'stock_notifications' THEN v_limit := 10;
+    ELSE RETURN;
+    END IF;
+
+    v_ip_text := split_part(coalesce(v_headers->>'x-forwarded-for', ''), ',', 1);
+    IF trim(v_ip_text) = '' THEN RETURN; END IF;
+    BEGIN
+        v_ip := trim(v_ip_text)::inet;
+    EXCEPTION WHEN invalid_text_representation THEN
+        RETURN;
+    END;
+
+    INSERT INTO private.order_request_limits(client_ip, window_started_at, request_count)
+    VALUES (v_ip, now(), 1)
+    ON CONFLICT (client_ip) DO UPDATE
+      SET window_started_at = CASE
+            WHEN private.order_request_limits.window_started_at <= now() - interval '5 minutes' THEN now()
+            ELSE private.order_request_limits.window_started_at END,
+          request_count = CASE
+            WHEN private.order_request_limits.window_started_at <= now() - interval '5 minutes' THEN 1
+            ELSE private.order_request_limits.request_count + 1 END
+    RETURNING window_started_at, request_count INTO v_window_started_at, v_request_count;
+
+    IF v_request_count > v_limit THEN
+        RAISE SQLSTATE 'PGRST'
+          USING message = json_build_object('message', 'Request limit exceeded. Please try again later.')::text,
+                detail = json_build_object('status', 429)::text;
+    END IF;
+
+    IF random() < 0.01 THEN
+        DELETE FROM private.order_request_limits
+        WHERE window_started_at < now() - interval '1 day';
+    END IF;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.check_request() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.check_request() TO authenticator;
+ALTER ROLE authenticator SET pgrst.db_pre_request = 'public.check_request';
+NOTIFY pgrst, 'reload config';

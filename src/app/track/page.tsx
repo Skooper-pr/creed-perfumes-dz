@@ -340,4 +340,113 @@ export default function TrackOrderPage() {
                                   شركة التوصيل: {comp.name_ar} ({comp.name})
                                 </span>
                                 <span className="text-xs text-[#77736B] block mt-0.5">
-                                  رقم التتبع: <strong className="font-mono text-xs font-b
+                                  رقم التتبع: <strong className="font-mono text-xs font-bold text-[#151515]" dir="ltr">{order.tracking_number}</strong>
+                                </span>
+                              </div>
+                            </div>
+
+                            {order.delivery_tracking_url && (
+                              <a
+                                href={order.delivery_tracking_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs py-1.5 px-3 rounded-full bg-white border border-[#E5E0D5] hover:border-[#151515] text-[#151515] font-medium flex items-center gap-1.5 self-start sm:self-auto transition-colors"
+                              >
+                                <span>تتبع الشحنة</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                          </div>
+
+                          {order.delivery_status_raw && (
+                            <div className="bg-white p-2.5 rounded-lg border border-[#E5E0D5] text-xs text-[#151515]">
+                              الحالة المحدثة: <strong>{order.delivery_status_raw}</strong>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Items Ordered */}
+                    <div className="bg-[#FAF8F5] p-4 rounded-xl space-y-3 border border-[#E5E0D5]/70">
+                      <span className="text-xs font-semibold text-[#151515] block">العطور في هذه الطلبية:</span>
+                      <div className="space-y-2">
+                        {order.items.map((item, idx) => (
+                          <div key={idx} className="flex items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-3">
+                              {item.image && (
+                                <div className="w-10 h-10 rounded-lg bg-white p-1 border border-[#E5E0D5] shrink-0 relative overflow-hidden">
+                                  <Image src={item.image} alt={item.name} fill sizes="40px" className="object-contain" />
+                                </div>
+                              )}
+                              <div>
+                                <span className="font-medium text-[#151515] block">{item.name}</span>
+                                <span className="text-[#77736B] text-[11px]">الكمية: {item.qty}</span>
+                              </div>
+                            </div>
+                            <span className="font-bold text-[#151515]">
+                              {(item.price * item.qty).toLocaleString('ar-DZ')} دج
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Total Breakdown */}
+                      <div className="pt-3 border-t border-[#E5E0D5] flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs">
+                        <div className="text-[#77736B]">
+                          <span>سعر التوصيل: </span>
+                          <strong className="text-[#151515]">{order.delivery_fee.toLocaleString('ar-DZ')} دج</strong>
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-[#77736B]">الإجمالي عند الاستلام:</span>
+                          <span className="text-base font-bold text-[#151515]">
+                            {order.total_price.toLocaleString('ar-DZ')} دج
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Reassurance Note */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs text-[#77736B]">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-[#6E603F] shrink-0" />
+                        <span>يحق لك فتح الطرد ومعاينة العطر قبل تسليم المبلغ للموزع.</span>
+                      </div>
+
+                      {siteConfig.contact.whatsappLink && (
+                        <a
+                          href={siteConfig.contact.whatsappLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-[#151515] hover:text-[#6E603F] font-medium flex items-center gap-1"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>استفسار واتساب</span>
+                        </a>
+                      )}
+                    </div>
+
+                  </div>
+                );
+              })}
+
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* Back to Home */}
+      <div className="text-center pt-2">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-[#77736B] hover:text-[#151515] transition-colors"
+        >
+          <ArrowRight className="w-3.5 h-3.5" />
+          <span>العودة لصفحة المتجر الرئيسية</span>
+        </Link>
+      </div>
+
+    </div>
+  );
+}
