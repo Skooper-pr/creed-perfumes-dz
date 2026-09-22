@@ -18,6 +18,11 @@
   to = "/.netlify/functions/telegram-webhook"
   status = 200
 
+[[redirects]]
+  from = "/api/order-notification"
+  to = "/.netlify/functions/order-notification"
+  status = 200
+
 # Delivery Proxy Endpoint (server-side courier calls)
 [[redirects]]
   from = "/api/delivery-proxy"
@@ -33,3 +38,4 @@
   to = "/.netlify/functions/daily-digest"
   status = 200
 
+# Baseline b

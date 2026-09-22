@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const ADMIN_USER_ID = '698fd6a7-930d-45f4-93e7-0462a296646a';
 
 interface ProxyRequestBody {
   provider: string;
@@ -9,18 +10,10 @@ interface ProxyRequestBody {
   payload: any;
 }
 
-export const handler = async (event: { httpMethod: string; body?: string | null }) => {
-  // CORS Headers for secure API consumption
+export const handler = async (event: { httpMethod: string; headers?: Record<string, string | undefined>; body?: string | null }) => {
   const headers = {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
-
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
-  }
 
   if (event.httpMethod !== 'POST') {
     return {
@@ -31,6 +24,25 @@ export const handler = async (event: { httpMethod: string; body?: string | null 
   }
 
   try {
+    const authorization = event.headers?.authorization || event.headers?.Authorization || '';
+    const accessToken = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
+    if (!accessToken || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) };
+    }
+
+    const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: authData, error: authError } = await authClient.auth.getUser(accessToken);
+    if (authError || authData.user?.id !== ADMIN_USER_ID) {
+      return { statusCode: 403, headers, body: JSON.stringify({ error: 'Forbidden' }) };
+    }
+
+    const adminClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
     const { provider, action, payload }: ProxyRequestBody = JSON.parse(event.body || '{}');
 
     if (!provider || !action) {
@@ -43,9 +55,8 @@ export const handler = async (event: { httpMethod: string; body?: string | null 
 
     // Retrieve delivery settings securely from Supabase admin_settings on the server
     let deliverySettings: Record<string, any> = {};
-    if (SUPABASE_URL && SUPABASE_KEY) {
-      const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-      const { data } = await supabase
+    if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+      const { data } = await adminClient
         .from('admin_settings')
         .select('value')
         .eq('key', 'delivery_settings')
@@ -88,43 +99,4 @@ export const handler = async (event: { httpMethod: string; body?: string | null 
       }
 
       if (action === 'track') {
-        const tracking = payload?.tracking;
-        if (!tracking) {
-          return {
-            statusCode: 400,
-            headers,
-            body: JSON.stringify({ error: 'Missing tracking number in payload' }),
-          };
-        }
-
-        const response = await fetch(`https://api.yalidine.app/v1/histories/?tracking=${encodeURIComponent(tracking)}`, {
-          headers: {
-            'X-API-ID': apiId,
-            'X-API-TOKEN': apiToken,
-          },
-        });
-
-        const data = await response.json();
-        return {
-          statusCode: response.status,
-          headers,
-          body: JSON.stringify(data),
-        };
-      }
-    }
-
-    // Default response if provider does not have a live server API implementation
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ error: `Provider '${provider}' or action '${action}' not supported for direct proxy` }),
-    };
-  } catch (error: any) {
-    console.error('delivery-proxy error:', error);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: error.message || 'Internal server error' }),
-    };
-  }
-};
+   

@@ -72,6 +72,31 @@ CREATE TABLE IF NOT EXISTS public.orders (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Server-only idempotency gate for Telegram order notifications.
+CREATE TABLE IF NOT EXISTS public.telegram_notified_orders (
+    order_id TEXT PRIMARY KEY REFERENCES public.orders(id) ON DELETE CASCADE,
+    notified_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.telegram_notified_orders ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.telegram_notified_orders FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE public.telegram_notified_orders TO service_role;
+CREATE POLICY "Server manages notification receipts"
+    ON public.telegram_notified_orders FOR ALL
+    TO service_role USING (true) WITH CHECK (true);
+
+-- Brute-force throttle for exact order-code + phone tracking lookups.
+CREATE TABLE IF NOT EXISTS public.tracking_attempts (
+    phone TEXT PRIMARY KEY,
+    window_started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    attempt_count INTEGER NOT NULL DEFAULT 0
+);
+ALTER TABLE public.tracking_attempts ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.tracking_attempts FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE public.tracking_attempts TO service_role;
+CREATE POLICY "Server manages tracking attempts"
+    ON public.tracking_attempts FOR ALL
+    TO service_role USING (true) WITH CHECK (true);
+
 -- Automatic Column Migrations for Existing Databases
 DO $$ BEGIN
     ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS stock_deducted BOOLEAN DEFAULT false;
@@ -98,6 +123,8 @@ ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.admin_settings ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.admin_settings FROM PUBLIC, anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.admin_settings TO authenticated, service_role;
 
 DROP POLICY IF EXISTS "Allow full access on categories" ON public.categories;
 DROP POLICY IF EXISTS "Allow admin all on categories" ON public.categories;
@@ -117,8 +144,8 @@ CREATE POLICY "Public read categories"
 CREATE POLICY "Admin manage categories"
     ON public.categories FOR ALL
     TO authenticated
-    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
-    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
+    USING ((SELECT auth.uid()) = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
+    WITH CHECK ((SELECT auth.uid()) = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
 
 -- Products Policies
 CREATE POLICY "Public read products"
@@ -128,8 +155,8 @@ CREATE POLICY "Public read products"
 CREATE POLICY "Admin manage products"
     ON public.products FOR ALL
     TO authenticated
-    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
-    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
+    USING ((SELECT auth.uid()) = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
+    WITH CHECK ((SELECT auth.uid()) = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
 
 -- Orders Policies (Customers can create orders without login; Admin can read and update all)
 CREATE POLICY "Public create orders"
@@ -142,12 +169,15 @@ CREATE POLICY "Public create orders"
         jsonb_array_length(items) BETWEEN 1 AND 50 AND
         total_price >= 0 AND delivery_fee >= 0
     );
+REVOKE ALL ON TABLE public.orders FROM PUBLIC, anon;
+GRANT INSERT ON TABLE public.orders TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.orders TO authenticated, service_role;
 
 CREATE POLICY "Admin manage orders"
     ON public.orders FOR ALL
     TO authenticated
-    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
-    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
+    USING ((SELECT auth.uid()) = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
+    WITH CHECK ((SELECT auth.uid()) = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
 
 -- Admin Settings Policies
 CREATE POLICY "Allow admin all on settings"
@@ -163,26 +193,70 @@ CREATE POLICY "Allow admin all on settings"
 CREATE OR REPLACE FUNCTION public.verify_and_recalc_order_total()
 RETURNS trigger
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
     item_record jsonb;
+    verified_items jsonb := '[]'::jsonb;
     calculated_subtotal NUMERIC(12, 2) := 0;
     item_price NUMERIC(12, 2);
     item_qty INT;
     v_recent_count INT;
+    v_product_id TEXT;
+    v_product_name TEXT;
+    v_stock INT;
+    v_bundle_product_ids jsonb;
+    v_bundle_price NUMERIC(12, 2);
+    v_bundle_discount NUMERIC(12, 2);
+    v_coupon RECORD;
+    v_disc NUMERIC(12, 2) := 0;
+    v_child_id TEXT;
 BEGIN
-    IF jsonb_typeof(NEW.items) != 'array' OR jsonb_array_length(NEW.items) < 1 THEN
+    IF jsonb_typeof(NEW.items) IS DISTINCT FROM 'array' OR jsonb_array_length(NEW.items) NOT BETWEEN 1 AND 50 THEN
         RAISE EXCEPTION 'Order must contain at least one item.';
     END IF;
 
     FOR item_record IN SELECT * FROM jsonb_array_elements(NEW.items) LOOP
-        item_price := (item_record->>'price')::NUMERIC;
         item_qty := (item_record->>'qty')::INT;
-        IF item_price < 0 OR item_qty <= 0 THEN
-            RAISE EXCEPTION 'Invalid item price or quantity in order.';
+        v_product_id := item_record->>'product_id';
+        IF item_qty IS NULL OR item_qty NOT BETWEEN 1 AND 20 OR v_product_id IS NULL THEN
+            RAISE EXCEPTION 'Invalid product or quantity.';
         END IF;
+
+        IF coalesce((item_record->>'is_bundle')::boolean, false) THEN
+            SELECT b.price, b.discount_price, b.name, b.product_ids
+              INTO v_bundle_price, v_bundle_discount, v_product_name, v_bundle_product_ids
+              FROM public.bundles AS b
+             WHERE b.id = v_product_id AND b.is_active = true
+             FOR SHARE;
+            IF NOT FOUND THEN RAISE EXCEPTION 'This bundle is unavailable.'; END IF;
+            item_price := coalesce(v_bundle_discount, v_bundle_price);
+            IF jsonb_typeof(v_bundle_product_ids) IS DISTINCT FROM 'array' OR jsonb_array_length(v_bundle_product_ids) = 0 THEN
+                RAISE EXCEPTION 'This bundle has no available products.';
+            END IF;
+            FOR v_child_id IN SELECT jsonb_array_elements_text(v_bundle_product_ids) LOOP
+                SELECT p.stock INTO v_stock FROM public.products AS p WHERE p.id = v_child_id FOR SHARE;
+                IF NOT FOUND OR v_stock < item_qty THEN RAISE EXCEPTION 'A product in this bundle is out of stock.'; END IF;
+            END LOOP;
+            item_record := jsonb_set(item_record, '{bundle_product_ids}', v_bundle_product_ids, true);
+        ELSE
+            SELECT coalesce(p.discount_price, p.price), p.name, p.stock
+              INTO item_price, v_product_name, v_stock
+              FROM public.products AS p
+             WHERE p.id = v_product_id
+             FOR SHARE;
+            IF NOT FOUND THEN RAISE EXCEPTION 'This product is unavailable.'; END IF;
+            IF v_stock < item_qty THEN RAISE EXCEPTION 'This product is out of stock.'; END IF;
+        END IF;
+
+        IF item_price IS NULL OR item_price < 0 THEN RAISE EXCEPTION 'Invalid product price.'; END IF;
+        item_record := jsonb_set(item_record, '{price}', to_jsonb(item_price), true);
+        item_record := jsonb_set(item_record, '{name}', to_jsonb(v_product_name), true);
+        verified_items := verified_items || jsonb_build_array(item_record);
         calculated_subtotal := calculated_subtotal + (item_price * item_qty);
     END LOOP;
+    NEW.items := verified_items;
 
     IF NEW.delivery_fee IS NULL OR NEW.delivery_fee < 0 THEN
         NEW.delivery_fee := 600;
@@ -190,31 +264,25 @@ BEGIN
 
     -- (4c) If coupon applied, validate and apply discount server-side
     IF NEW.coupon_code IS NOT NULL AND TRIM(NEW.coupon_code) != '' THEN
-        DECLARE
-            v_coupon RECORD;
-            v_disc NUMERIC(12, 2) := 0;
-        BEGIN
-            SELECT * INTO v_coupon FROM public.coupons 
-            WHERE UPPER(code) = UPPER(TRIM(NEW.coupon_code)) 
-              AND is_active = true 
-              AND (expires_at IS NULL OR expires_at > now())
-              AND (max_uses IS NULL OR used_count < max_uses);
-
-            IF FOUND THEN
-                IF v_coupon.min_order_amount IS NULL OR calculated_subtotal >= v_coupon.min_order_amount THEN
-                    IF v_coupon.discount_type = 'percentage' THEN
-                        v_disc := ROUND((calculated_subtotal * v_coupon.discount_value) / 100, 2);
-                    ELSE
-                        v_disc := LEAST(calculated_subtotal, v_coupon.discount_value);
-                    END IF;
-                    NEW.discount_amount := v_disc;
-                    calculated_subtotal := GREATEST(0, calculated_subtotal - v_disc);
-
-                    -- Increment coupon usage count
-                    UPDATE public.coupons SET used_count = used_count + 1 WHERE id = v_coupon.id;
-                END IF;
-            END IF;
-        END;
+        SELECT * INTO v_coupon FROM public.coupons
+         WHERE upper(code) = upper(trim(NEW.coupon_code))
+         FOR UPDATE;
+        IF NOT FOUND OR NOT v_coupon.is_active
+           OR (v_coupon.expires_at IS NOT NULL AND v_coupon.expires_at <= now())
+           OR (v_coupon.max_uses IS NOT NULL AND v_coupon.used_count >= v_coupon.max_uses)
+           OR calculated_subtotal < coalesce(v_coupon.min_order_amount, 0) THEN
+            RAISE EXCEPTION 'Coupon is invalid or no longer available.';
+        END IF;
+        IF v_coupon.discount_type = 'percentage' THEN
+            v_disc := round(calculated_subtotal * v_coupon.discount_value / 100, 2);
+        ELSE
+            v_disc := least(calculated_subtotal, v_coupon.discount_value);
+        END IF;
+        NEW.discount_amount := v_disc;
+        calculated_subtotal := greatest(0, calculated_subtotal - v_disc);
+        UPDATE public.coupons SET used_count = used_count + 1 WHERE id = v_coupon.id;
+    ELSE
+        NEW.discount_amount := 0;
     END IF;
 
     -- Enforce total_price server-side
@@ -229,8 +297,14 @@ BEGIN
         RAISE EXCEPTION 'تم تسجيل طلبية من هذا الرقم مؤخراً. يرجى الانتظار دقيقتين.';
     END IF;
 
-    -- (2d) Generate collision-free order number from Postgres sequence
-    NEW.order_number := 'DZ-' || nextval('creed_order_seq')::text;
+    -- Keep the random checkout code; fall back to the sequence for trusted imports.
+    IF NEW.order_number IS NULL OR NEW.order_number !~ '^DZ-[A-F0-9]{8}$' THEN
+        NEW.order_number := 'DZ-' || nextval('creed_order_seq')::text;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM public.blocked_phones b WHERE regexp_replace(b.phone, '[^0-9]', '', 'g') = regexp_replace(NEW.phone, '[^0-9]', '', 'g')) THEN
+        RAISE EXCEPTION 'This phone number cannot place an order.';
+    END IF;
 
     RETURN NEW;
 END;
@@ -244,57 +318,96 @@ CREATE TRIGGER trg_verify_order_total
     BEFORE INSERT ON public.orders
     FOR EACH ROW
     EXECUTE FUNCTION public.verify_and_recalc_order_total();
+REVOKE ALL ON FUNCTION public.verify_and_recalc_order_total() FROM PUBLIC, anon, authenticated;
 
--- RPC: Scoped Order Tracking (Publicly callable, but strictly returns only matching order rows)
-CREATE OR REPLACE FUNCTION public.track_orders(lookup_query text)
-RETURNS SETOF public.orders
+-- Public order tracking requires both the exact order number and the phone
+-- used at checkout. Return only the fields required by the tracking screen.
+DROP FUNCTION IF EXISTS public.track_orders(text);
+CREATE OR REPLACE FUNCTION public.track_order_with_phone(p_order_number text, p_phone text)
+RETURNS SETOF jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
-    clean_q text;
-    clean_no_zero text;
-    clean_with_zero text;
+    clean_phone text;
+    normalized_phone text;
+    clean_order_number text;
+    matched_order public.orders%ROWTYPE;
+    v_window_started_at timestamptz;
+    v_attempt_count integer;
 BEGIN
-    clean_q := regexp_replace(trim(lookup_query), '[\s\-\+\(\)]', '', 'g');
-    IF clean_q = '' THEN
+    clean_phone := regexp_replace(coalesce(p_phone, ''), '[^0-9]', '', 'g');
+    clean_order_number := upper(regexp_replace(coalesce(p_order_number, ''), '[\s-]', '', 'g'));
+    IF clean_phone = '' OR clean_order_number !~ '^DZ[A-F0-9]{8}$' THEN
         RETURN;
     END IF;
 
-    IF clean_q LIKE '213%' THEN
-        clean_no_zero := substr(clean_q, 4);
-        clean_with_zero := '0' || clean_no_zero;
-    ELSIF clean_q LIKE '0%' THEN
-        clean_with_zero := clean_q;
-        clean_no_zero := substr(clean_q, 2);
+    IF clean_phone LIKE '213%' THEN
+        normalized_phone := '0' || substr(clean_phone, 4);
+    ELSIF clean_phone LIKE '0%' THEN
+        normalized_phone := clean_phone;
     ELSE
-        clean_no_zero := clean_q;
-        clean_with_zero := '0' || clean_q;
+        normalized_phone := '0' || clean_phone;
     END IF;
 
-    RETURN QUERY
-    SELECT * FROM public.orders
-    WHERE 
-        lower(order_number) = lower(trim(lookup_query))
-        OR regexp_replace(phone, '[\s\-\+\(\)]', '', 'g') IN (clean_q, clean_no_zero, clean_with_zero)
-        OR (phone_secondary IS NOT NULL AND regexp_replace(phone_secondary, '[\s\-\+\(\)]', '', 'g') IN (clean_q, clean_no_zero, clean_with_zero))
-    ORDER BY created_at DESC;
+    IF normalized_phone !~ '^0[567][0-9]{8}$' THEN RETURN; END IF;
+
+    INSERT INTO public.tracking_attempts (phone, window_started_at, attempt_count)
+    VALUES (normalized_phone, now(), 1)
+    ON CONFLICT (phone) DO UPDATE
+      SET window_started_at = CASE
+            WHEN public.tracking_attempts.window_started_at <= now() - interval '15 minutes' THEN now()
+            ELSE public.tracking_attempts.window_started_at END,
+          attempt_count = CASE
+            WHEN public.tracking_attempts.window_started_at <= now() - interval '15 minutes' THEN 1
+            ELSE public.tracking_attempts.attempt_count + 1 END
+    RETURNING window_started_at, attempt_count INTO v_window_started_at, v_attempt_count;
+    IF v_attempt_count > 8 THEN RAISE EXCEPTION 'Too many tracking attempts. Try again later.'; END IF;
+
+    SELECT o.* INTO matched_order
+    FROM public.orders AS o
+    WHERE upper(regexp_replace(o.order_number, '[\s-]', '', 'g')) = clean_order_number
+      AND regexp_replace(coalesce(o.phone, ''), '[^0-9]', '', 'g') IN (clean_phone, normalized_phone)
+    LIMIT 1;
+
+    IF FOUND THEN
+        RETURN NEXT jsonb_build_object(
+            'id', matched_order.id,
+            'order_number', matched_order.order_number,
+            'status', matched_order.status,
+            'created_at', matched_order.created_at,
+            'wilaya', matched_order.wilaya,
+            'commune', matched_order.commune,
+            'items', matched_order.items,
+            'total_price', matched_order.total_price,
+            'delivery_fee', matched_order.delivery_fee,
+            'tracking_number', matched_order.tracking_number,
+            'delivery_provider', matched_order.delivery_provider,
+            'delivery_tracking_url', matched_order.delivery_tracking_url,
+            'delivery_status_raw', matched_order.delivery_status_raw
+        );
+    END IF;
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.track_orders(text) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.track_order_with_phone(text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.track_order_with_phone(text, text) TO anon, authenticated;
 
 -- RPC: Atomic Product Stock Adjustment
 CREATE OR REPLACE FUNCTION public.adjust_product_stock(p_product_id text, p_delta int)
 RETURNS int
 LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
+SECURITY INVOKER
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
     v_new_stock int;
 BEGIN
+    IF (SELECT auth.uid()) IS DISTINCT FROM '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid THEN
+        RAISE EXCEPTION 'Unauthorized';
+    END IF;
+
     UPDATE public.products
     SET stock = GREATEST(0, stock + p_delta)
     WHERE id = p_product_id OR slug = p_product_id
@@ -303,7 +416,8 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.adjust_product_stock(text, int) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.adjust_product_stock(text, int) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.adjust_product_stock(text, int) TO authenticated, service_role;
 
 -- RPC: Update Order Status from Telegram Bot (Authorized via Secret)
 -- The secret is stored via: ALTER DATABASE postgres SET app.telegram_bot_secret = 'your-secret-here';
@@ -316,7 +430,7 @@ CREATE OR REPLACE FUNCTION public.update_order_status_via_bot(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
     v_order public.orders%ROWTYPE;
@@ -357,7 +471,8 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.update_order_status_via_bot(text, order_status_type, text) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.update_order_status_via_bot(text, order_status_type, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.update_order_status_via_bot(text, order_status_type, text) TO service_role;
 
 -- 8. Storage Bucket for Perfume Images
 INSERT INTO storage.buckets (id, name, public) 
@@ -436,112 +551,4 @@ CREATE TABLE IF NOT EXISTS public.stock_notifications (
     id TEXT PRIMARY KEY DEFAULT ('notif-' || gen_random_uuid()),
     product_id TEXT NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
     product_name TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
-);
-
-ALTER TABLE public.stock_notifications ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Allow public insert stock notifications" ON public.stock_notifications;
-CREATE POLICY "Allow public insert stock notifications"
-    ON public.stock_notifications FOR INSERT
-    TO anon, authenticated
-    WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Admin manage stock notifications" ON public.stock_notifications;
-CREATE POLICY "Admin manage stock notifications"
-    ON public.stock_notifications FOR ALL
-    TO authenticated
-    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
-    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
-
--- 12. Coupons & Promo Codes
-CREATE TABLE IF NOT EXISTS public.coupons (
-    id TEXT PRIMARY KEY DEFAULT ('cpn-' || gen_random_uuid()),
-    code TEXT NOT NULL UNIQUE,
-    discount_type TEXT NOT NULL DEFAULT 'percentage', -- 'percentage' or 'fixed'
-    discount_value NUMERIC(10, 2) NOT NULL,
-    min_order_amount NUMERIC(10, 2) DEFAULT 0,
-    max_uses INT DEFAULT NULL,
-    used_count INT NOT NULL DEFAULT 0,
-    is_active BOOLEAN NOT NULL DEFAULT true,
-    expires_at TIMESTAMPTZ DEFAULT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
-);
-
-ALTER TABLE public.coupons ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Allow public select active coupons" ON public.coupons;
-CREATE POLICY "Allow public select active coupons"
-    ON public.coupons FOR SELECT
-    TO anon, authenticated
-    USING (is_active = true);
-
-DROP POLICY IF EXISTS "Admin manage coupons" ON public.coupons;
-CREATE POLICY "Admin manage coupons"
-    ON public.coupons FOR ALL
-    TO authenticated
-    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
-    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
-
--- Add coupon columns to orders table
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS coupon_code TEXT DEFAULT NULL;
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12, 2) DEFAULT 0;
-
--- Initial Seed Coupon: WELCOME10 (10% off)
-INSERT INTO public.coupons (id, code, discount_type, discount_value, min_order_amount, is_active)
-VALUES ('cpn-welcome10', 'CREED10', 'percentage', 10, 10000, true)
-ON CONFLICT (code) DO NOTHING;
-
--- 13. Blocked Phones (Blacklist for repeat no-shows)
-CREATE TABLE IF NOT EXISTS public.blocked_phones (
-    phone TEXT PRIMARY KEY,
-    reason TEXT DEFAULT 'عدم الرد أو رفض الاستلام المتكرر',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
-);
-
-ALTER TABLE public.blocked_phones ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Public check blocked phones" ON public.blocked_phones;
-CREATE POLICY "Public check blocked phones"
-    ON public.blocked_phones FOR SELECT
-    TO anon, authenticated
-    USING (true);
-
-DROP POLICY IF EXISTS "Admin manage blocked phones" ON public.blocked_phones;
-CREATE POLICY "Admin manage blocked phones"
-    ON public.blocked_phones FOR ALL
-    TO authenticated
-    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
-    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
-
--- 14. Product Bundles & Gift Sets (أطقم الهدايا والمجموعات الخاصة)
-CREATE TABLE IF NOT EXISTS public.bundles (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    slug TEXT NOT NULL UNIQUE,
-    description TEXT DEFAULT '',
-    badge_label TEXT DEFAULT 'مجموعة خاصة',
-    price NUMERIC(12, 2) NOT NULL DEFAULT 0,
-    discount_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
-    product_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
-    image TEXT DEFAULT '',
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
-);
-
-ALTER TABLE public.bundles ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Public select active bundles" ON public.bundles;
-CREATE POLICY "Public select active bundles"
-    ON public.bundles FOR SELECT
-    TO anon, authenticated
-    USING (is_active = true);
-
-DROP POLICY IF EXISTS "Admin manage bundles" ON public.bundles;
-CREATE POLICY "Admin manage bundles"
-    ON public.bundles FOR ALL
-    TO authenticated
-    USING (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid)
-    WITH CHECK (auth.uid() = '698fd6a7-930d-45f4-93e7-0462a296646a'::uuid);
+    phone 

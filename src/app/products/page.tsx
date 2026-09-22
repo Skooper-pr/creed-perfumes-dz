@@ -20,10 +20,13 @@ function ProductsContent() {
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc'>('featured');
+  const [stockFilter, setStockFilter] = useState<'all' | 'in-stock'>('all');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
+      setError(null);
       try {
         const [prodList, catList, bundleList] = await Promise.all([
           getProducts(),
@@ -35,6 +38,7 @@ function ProductsContent() {
         setBundles(bundleList);
       } catch (err) {
         console.error(err);
+        setError('تعذر تحميل التشكيلة حالياً. يرجى المحاولة مجدداً.');
       } finally {
         setLoading(false);
       }
@@ -48,9 +52,11 @@ function ProductsContent() {
     return products
       .filter((product) => {
         // Category filter
-        if (selectedCategory !== 'all' && product.category_id !== selectedCategory) {
+         if (selectedCategory !== 'all' && product.category_id !== selectedCategory) {
           return false;
-        }
+         }
+
+         if (stockFilter === 'in-stock' && (product.stock ?? 0) <= 0) return false;
 
         // Search query
         if (searchQuery.trim()) {
@@ -78,7 +84,7 @@ function ProductsContent() {
         // Default: featured first
         return (b.is_featured ? 1 : 0) - (a.is_featured ? 1 : 0);
       });
-  }, [products, selectedCategory, searchQuery, sortBy]);
+  }, [products, selectedCategory, searchQuery, sortBy, stockFilter]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8">
@@ -138,6 +144,10 @@ function ProductsContent() {
             </select>
             <SlidersHorizontal className="w-3.5 h-3.5 text-[#77736B] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
+          <label className="flex items-center gap-2 text-xs text-[#77736B] whitespace-nowrap cursor-pointer">
+            <input type="checkbox" checked={stockFilter === 'in-stock'} onChange={(e) => setStockFilter(e.target.checked ? 'in-stock' : 'all')} className="accent-[#151515]" />
+            المتوفر فقط
+          </label>
         </div>
       </div>
 
@@ -197,78 +207,5 @@ function ProductsContent() {
             subtext="التوصيل متوفر لكافة الـ 58 ولاية مع الدفع عند الاستلام"
           />
         </div>
-      ) : selectedCategory === 'bundles' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {bundles.map((bundle) => (
-            <BundleCard key={bundle.id} bundle={bundle} products={products} />
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {selectedCategory === 'all' && !searchQuery && bundles.length > 0 && (
-            <div className="bg-[#FAF8F5] rounded-3xl p-6 sm:p-8 border border-[#E5E0D5] space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-semibold text-[#6E603F] uppercase tracking-wider">
-                    أطقم الهدايا والعروض الحصرية
-                  </span>
-                  <h3 className="text-xl font-bold text-[#151515] mt-0.5">
-                    مجموعات Creed الخاصة
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setSelectedCategory('bundles')}
-                  className="text-xs text-[#6E603F] font-semibold hover:underline"
-                >
-                  عرض جميع الأطقم ({bundles.length}) ←
-                </button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {bundles.map((bundle) => (
-                  <BundleCard key={bundle.id} bundle={bundle} products={products} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {filteredProducts.length > 0 ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-              {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          ) : (
-        <div className="bg-white rounded-2xl p-12 text-center border border-[#E5E0D5] space-y-3">
-          <p className="text-base font-semibold text-[#151515]">لم يتم العثور على عطور مطابقة</p>
-          <p className="text-xs text-[#77736B]">يرجى تجربة البحث باسم آخر أو إزالة التصفية الحالية.</p>
-          <button
-            onClick={() => {
-              setSearchQuery('');
-              setSelectedCategory('all');
-            }}
-            className="btn-luxury-outline text-xs px-5 py-2 mt-2"
-          >
-            إعادة تعيين البحث
-          </button>
-        </div>
-      )}
-        </div>
-      )}
-
-    </div>
-  );
-}
-
-export default function ProductsPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="py-24 flex items-center justify-center">
-          <Loader text="جاري تجهيز تشكيلة العطور..." />
-        </div>
-      }
-    >
-      <ProductsContent />
-    </Suspense>
-  );
-}
+      ) : error ? (
+        <div role="alert" className="bg-white rounded-2xl p-12 text-ce

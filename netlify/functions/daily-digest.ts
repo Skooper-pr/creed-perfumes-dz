@@ -1,14 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 import { calculateSalesStats, formatDailyDigestMessage } from './shared/stats';
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || '';
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://hkdyuasngmyzrhydariq.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = SUPABASE_URL && SUPABASE_KEY ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 function getAuthorizedAdminIds(): string[] {
-  const envVal = process.env.TELEGRAM_ADMIN_CHAT_IDS || process.env.NEXT_PUBLIC_TELEGRAM_ADMIN_CHAT_IDS;
+  const envVal = process.env.TELEGRAM_ADMIN_CHAT_IDS || '';
   if (!envVal) return [];
   return envVal
     .split(',')
@@ -40,6 +40,10 @@ async function sendTelegramMessage(chatId: string, text: string) {
 }
 
 export const handler = async (event: { httpMethod?: string }) => {
+  if (!BOT_TOKEN || !supabase) {
+    console.error('Daily digest requires private Telegram and Supabase server credentials');
+    return;
+  }
   console.log('Daily digest scheduled function triggered at', new Date().toISOString());
 
   try {
@@ -63,32 +67,4 @@ export const handler = async (event: { httpMethod?: string }) => {
 
     // 3. Send to all configured admins
     const adminChatIds = getAuthorizedAdminIds();
-    const sendResults: Record<string, boolean> = {};
-
-    if (adminChatIds.length === 0) {
-      console.warn('No TELEGRAM_ADMIN_CHAT_IDS configured for daily digest');
-    }
-
-    for (const chatId of adminChatIds) {
-      const res = await sendTelegramMessage(chatId, message);
-      sendResults[chatId] = Boolean(res?.ok);
-    }
-
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ok: true,
-        stats,
-        recipients_count: adminChatIds.length,
-        delivery: sendResults,
-      }),
-    };
-  } catch (err: any) {
-    console.error('Fatal error in daily digest:', err);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error', details: err?.message }),
-    };
-  }
-};
+    const sendResults: Record<string, bo

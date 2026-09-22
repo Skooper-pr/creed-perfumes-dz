@@ -1,21 +1,19 @@
 // TODO [SECURITY — MANUAL ACTION REQUIRED]:
-// Bot token MUST be rotated via @BotFather — the old token is permanently
-// exposed in this public repo's git history (along with the Supabase anon key
-// and admin chat ID that were previously hardcoded as fallback defaults).
-// After rotating, update the TELEGRAM_BOT_TOKEN env var in Netlify and
-// re-register the webhook URL with the new token.
+// Rotate any bot token that was used by a public build or committed in Git.
+// Re-register Telegram's webhook with the new token and TELEGRAM_SECURITY_SECRET.
 
+import { timingSafeEqual } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import { calculateSalesStats, formatDailyDigestMessage } from './shared/stats';
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || '';
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://hkdyuasngmyzrhydariq.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = SUPABASE_URL && SUPABASE_KEY ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 function getAuthorizedAdminIds(): string[] {
-  const envVal = process.env.TELEGRAM_ADMIN_CHAT_IDS || process.env.NEXT_PUBLIC_TELEGRAM_ADMIN_CHAT_IDS;
+  const envVal = process.env.TELEGRAM_ADMIN_CHAT_IDS || '';
   if (!envVal) return [];
   return envVal
     .split(',')
@@ -45,13 +43,25 @@ async function callTelegram(method: string, payload: Record<string, unknown>) {
   }
 }
 
-export const handler = async (event: { httpMethod: string; body?: string | null }) => {
+export const handler = async (event: { httpMethod: string; headers?: Record<string, string | undefined>; body?: string | null }) => {
+  if (!BOT_TOKEN || !supabase) {
+    return { statusCode: 503, body: 'Telegram service is not configured' };
+  }
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ok: true, message: 'Telegram webhook is active' }),
     };
+  }
+
+  const webhookSecret = process.env.TELEGRAM_SECURITY_SECRET || '';
+  const suppliedSecret = event.headers?.['x-telegram-bot-api-secret-token'] ||
+    event.headers?.['X-Telegram-Bot-Api-Secret-Token'] || '';
+  const expectedBytes = Buffer.from(webhookSecret);
+  const suppliedBytes = Buffer.from(suppliedSecret);
+  if (!webhookSecret || expectedBytes.length !== suppliedBytes.length || !timingSafeEqual(expectedBytes, suppliedBytes)) {
+    return { statusCode: 401, body: 'Unauthorized' };
   }
 
   if (!event.body) {
@@ -228,87 +238,4 @@ export const handler = async (event: { httpMethod: string; body?: string | null 
         if (!pendingOrders || pendingOrders.length === 0) {
           await callTelegram('sendMessage', {
             chat_id: chatId,
-            text: '✨ لا توجد حالياً أي طلبيات معلقة بانتظار التأكيد! كل الطلبات تمت معالجتها.',
-          });
-        } else {
-          await callTelegram('sendMessage', {
-            chat_id: chatId,
-            text: `📋 *توجد ${pendingOrders.length} طلبيات بانتظار التأكيد:*`,
-            parse_mode: 'Markdown',
-          });
-
-          for (const ord of pendingOrders) {
-            const cleanPhone = (ord.phone || '').replace(/[\s\-\+]/g, '');
-            const waPhone = cleanPhone.startsWith('0')
-              ? '213' + cleanPhone.slice(1)
-              : cleanPhone.startsWith('213')
-              ? cleanPhone
-              : '213' + cleanPhone;
-
-            await callTelegram('sendMessage', {
-              chat_id: chatId,
-              text: `📦 *طلب رقم:* \`#${ord.order_number}\`
-👤 *الزبون:* ${ord.customer_name}
-📞 *الهاتف:* ${ord.phone}
-📍 *الولاية:* ${ord.wilaya} (${ord.commune})
-💰 *المبلغ:* *${Number(ord.total_price).toLocaleString('ar-DZ')} دج*`,
-              parse_mode: 'Markdown',
-              reply_markup: {
-                inline_keyboard: [
-                  [
-                    { text: '✅ تأكيد الطلب', callback_data: `act:confirmed:${ord.id}` },
-                    { text: '🚚 تم الشحن', callback_data: `act:shipped:${ord.id}` },
-                  ],
-                  [
-                    { text: '❌ إلغاء الطلب', callback_data: `act:cancelled:${ord.id}` },
-                    { text: '💬 مراسلة واتساب', url: `https://wa.me/${waPhone}` },
-                  ],
-                ],
-              },
-            });
-          }
-        }
-      } else if (text.startsWith('/stats')) {
-        const { data: allOrders } = await supabase
-          .from('orders')
-          .select('*');
-
-        const stats = calculateSalesStats(allOrders || []);
-        const statsMessage = formatDailyDigestMessage(stats);
-
-        await callTelegram('sendMessage', {
-          chat_id: chatId,
-          text: statsMessage,
-          parse_mode: 'Markdown',
-        });
-      } else if (text.startsWith('/help')) {
-        await callTelegram('sendMessage', {
-          chat_id: chatId,
-          text: `ℹ️ *دليل الاستخدام وإضافة شركاء أو مدراء:*
-
-1. *كيف يشارك أكثر من شخص في إدارة الطلبات؟*
-   • يمكنك إنشاء مجموعة تيليجرام خاصة (Private Group).
-   • أضف إليها شريكك أو موظفيك.
-   • أضف البوت \`@creed_dz_orders_bot\` إلى المجموعة.
-   • اكتب في المجموعة \`/start\` وستصل كل الطلبيات هناك ويمكن لأي شخص الضغط على الأزرار!
-
-2. *حماية البوت:*
-   • البوت يرفض أي شخص غريب لا يتواجد في قائمة المدراء المعتمدة.`,
-          parse_mode: 'Markdown',
-        });
-      }
-    }
-
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ok: true }),
-    };
-  } catch (err) {
-    console.error('Webhook execution error:', err);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' }),
-    };
-  }
-};
+          

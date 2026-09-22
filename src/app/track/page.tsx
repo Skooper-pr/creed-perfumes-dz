@@ -25,19 +25,20 @@ import { Order, OrderStatus } from '@/types';
 import { siteConfig } from '@/config/site';
 
 export default function TrackOrderPage() {
-  const [query, setQuery] = useState('');
+  const [phone, setPhone] = useState('');
+  const [orderNumber, setOrderNumber] = useState('');
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
+    if (!phone.trim() || !orderNumber.trim()) return;
 
     setLoading(true);
     setSearched(true);
     try {
-      const results = await getOrdersByPhone(query.trim());
+      const results = await getOrdersByPhone(phone.trim(), orderNumber.trim());
       setOrders(results);
     } catch (err) {
       console.error(err);
@@ -116,7 +117,7 @@ export default function TrackOrderPage() {
           تتبع حالة طلبيتك لحظة بلحظة
         </h1>
         <p className="text-xs sm:text-sm text-[#77736B] max-w-md mx-auto leading-relaxed">
-          أدخل رقم هاتفك المسجل في الطلب أو كود الطلبية (DZ-XXXXX) للاطلاع على حالة طردك فوراً.
+          أدخل رقم الهاتف المسجل ورقم الطلب الموجود في رسالة التأكيد للاطلاع على حالة طردك.
         </p>
       </div>
 
@@ -124,22 +125,37 @@ export default function TrackOrderPage() {
       <div className="bg-white rounded-2xl p-6 sm:p-8 border border-[#E5E0D5] max-w-2xl mx-auto shadow-sm">
         <form onSubmit={handleSearch} className="space-y-4">
           <div>
-            <label htmlFor="trackQuery" className="block text-xs font-semibold text-[#151515] mb-2">
-              رقم الهاتف الجزائري أو كود الطلب:
-            </label>
-            <div className="relative">
+              <label htmlFor="trackOrderNumber" className="block text-xs font-semibold text-[#151515] mb-2">
+              رقم الطلب:
+              </label>
+            <div className="relative mb-4">
               <input
-                id="trackQuery"
+                id="trackOrderNumber"
                 type="text"
                 dir="ltr"
                 required
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="مثال: 0550123456 أو DZ-84921"
+                value={orderNumber}
+                onChange={(e) => setOrderNumber(e.target.value)}
+                placeholder="مثال: DZ-8A2F17C4"
                 className="w-full bg-[#FAF8F5] text-[#151515] text-sm sm:text-base pr-11 pl-4 py-3 rounded-xl border border-[#E5E0D5] outline-none focus:border-[#151515] font-mono text-right transition-colors"
               />
               <Search className="w-4 h-4 text-[#77736B] absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
+            <label htmlFor="trackPhone" className="block text-xs font-semibold text-[#151515] mb-2">
+              رقم الهاتف المستخدم عند الطلب:
+            </label>
+            <input
+              id="trackPhone"
+              type="tel"
+              inputMode="tel"
+              dir="ltr"
+              autoComplete="tel"
+              required
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="مثال: 0550123456"
+              className="w-full bg-[#FAF8F5] text-[#151515] text-sm sm:text-base px-4 py-3 rounded-xl border border-[#E5E0D5] outline-none focus:border-[#151515] font-mono text-right transition-colors"
+            />
           </div>
 
           <button
@@ -162,7 +178,7 @@ export default function TrackOrderPage() {
         </form>
 
         <p className="text-[11px] text-center text-[#77736B] mt-3">
-          يتم تحديث مسار التوصيل فور تسجيله لدى مندوب شركة النقل في ولايتك.
+          نطلب المعلومتين لحماية تفاصيل طلبك من الاطلاع غير المصرح به.
         </p>
       </div>
 
@@ -324,113 +340,4 @@ export default function TrackOrderPage() {
                                   شركة التوصيل: {comp.name_ar} ({comp.name})
                                 </span>
                                 <span className="text-xs text-[#77736B] block mt-0.5">
-                                  رقم التتبع: <strong className="font-mono text-xs font-bold text-[#151515]" dir="ltr">{order.tracking_number}</strong>
-                                </span>
-                              </div>
-                            </div>
-
-                            {order.delivery_tracking_url && (
-                              <a
-                                href={order.delivery_tracking_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs py-1.5 px-3 rounded-full bg-white border border-[#E5E0D5] hover:border-[#151515] text-[#151515] font-medium flex items-center gap-1.5 self-start sm:self-auto transition-colors"
-                              >
-                                <span>تتبع الشحنة</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
-                            )}
-                          </div>
-
-                          {order.delivery_status_raw && (
-                            <div className="bg-white p-2.5 rounded-lg border border-[#E5E0D5] text-xs text-[#151515]">
-                              الحالة المحدثة: <strong>{order.delivery_status_raw}</strong>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                    {/* Items Ordered */}
-                    <div className="bg-[#FAF8F5] p-4 rounded-xl space-y-3 border border-[#E5E0D5]/70">
-                      <span className="text-xs font-semibold text-[#151515] block">العطور في هذه الطلبية:</span>
-                      <div className="space-y-2">
-                        {order.items.map((item, idx) => (
-                          <div key={idx} className="flex items-center justify-between gap-3 text-xs">
-                            <div className="flex items-center gap-3">
-                              {item.image && (
-                                <div className="w-10 h-10 rounded-lg bg-white p-1 border border-[#E5E0D5] shrink-0 relative overflow-hidden">
-                                  <Image src={item.image} alt={item.name} fill sizes="40px" className="object-contain" />
-                                </div>
-                              )}
-                              <div>
-                                <span className="font-medium text-[#151515] block">{item.name}</span>
-                                <span className="text-[#77736B] text-[11px]">الكمية: {item.qty}</span>
-                              </div>
-                            </div>
-                            <span className="font-bold text-[#151515]">
-                              {(item.price * item.qty).toLocaleString('ar-DZ')} دج
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Total Breakdown */}
-                      <div className="pt-3 border-t border-[#E5E0D5] flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs">
-                        <div className="text-[#77736B]">
-                          <span>سعر التوصيل: </span>
-                          <strong className="text-[#151515]">{order.delivery_fee.toLocaleString('ar-DZ')} دج</strong>
-                        </div>
-                        <div className="flex items-baseline gap-1.5">
-                          <span className="text-[#77736B]">الإجمالي عند الاستلام:</span>
-                          <span className="text-base font-bold text-[#151515]">
-                            {order.total_price.toLocaleString('ar-DZ')} دج
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Reassurance Note */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs text-[#77736B]">
-                      <div className="flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4 text-[#6E603F] shrink-0" />
-                        <span>يحق لك فتح الطرد ومعاينة العطر قبل تسليم المبلغ للموزع.</span>
-                      </div>
-
-                      {siteConfig.contact.whatsappLink && (
-                        <a
-                          href={siteConfig.contact.whatsappLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-[#151515] hover:text-[#6E603F] font-medium flex items-center gap-1"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>استفسار واتساب</span>
-                        </a>
-                      )}
-                    </div>
-
-                  </div>
-                );
-              })}
-
-            </div>
-          )}
-
-        </div>
-      )}
-
-      {/* Back to Home */}
-      <div className="text-center pt-2">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-[#77736B] hover:text-[#151515] transition-colors"
-        >
-          <ArrowRight className="w-3.5 h-3.5" />
-          <span>العودة لصفحة المتجر الرئيسية</span>
-        </Link>
-      </div>
-
-    </div>
-  );
-}
+                                  رقم التتبع: <strong className="font-mono text-xs font-b
