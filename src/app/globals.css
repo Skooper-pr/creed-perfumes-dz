@@ -4,147 +4,59 @@
 
 @layer base {
   :root {
-    --primary: #151515;
-    --primary-container: #242424;
-    --secondary: #6E603F;
-    --secondary-container: #8A7950;
-    --accent: #B89B5E;
-    --background: #F7F4EE;
-    --surface: #FFFFFF;
-    --surface-container-low: #FAF8F5;
-    --surface-container: #F7F4EE;
-    --surface-container-high: #EFECE4;
-    --surface-container-highest: #E5E0D5;
-    --surface-container-lowest: #FFFFFF;
-    --on-surface: #151515;
-    --on-surface-variant: #77736B;
-    --border: #E5E0D5;
+    --ink: #171716;
+    --ink-soft: #242421;
+    --gold: #b89b5e;
+    --gold-deep: #907744;
+    --paper: #f7f4ee;
+    --paper-deep: #eee9df;
+    --line: #e5e0d5;
+    --muted: #817b70;
   }
 
-  html {
-    direction: rtl;
-    text-align: right;
-    scroll-behavior: smooth;
-    background-color: var(--background);
-    color: var(--on-surface);
-  }
-
-  body {
-    background-color: var(--background);
-    color: var(--on-surface);
-    min-height: 100vh;
-    overflow-x: hidden;
-    -webkit-tap-highlight-color: transparent;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-  }
-
-  /* Accessible touch target sizes for mobile */
-  button, a, input, select, textarea {
-    min-height: 44px;
-    touch-action: manipulation;
-  }
-
-  /* Focus states */
-  *:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
+  html { direction: rtl; text-align: right; scroll-behavior: smooth; background: var(--paper); }
+  body { min-height: 100vh; overflow-x: hidden; background: var(--paper); color: var(--ink); -webkit-tap-highlight-color: transparent; font-feature-settings: "cv02", "cv03", "cv04", "cv11"; }
+  button, a, input, select, textarea { min-height: 44px; touch-action: manipulation; }
+  *:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+  ::selection { background: #d8c395; color: var(--ink); }
 }
 
 @layer components {
-  /* High-end Luxury Button System */
-  .btn-luxury {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full text-sm font-medium transition-all duration-300 active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none;
-  }
-
-  .btn-luxury-primary {
-    @apply btn-luxury bg-[#151515] text-white hover:bg-[#2c2c2c] shadow-sm hover:shadow-md;
-  }
-
-  .btn-luxury-secondary {
-    @apply btn-luxury bg-[#6E603F] text-white hover:bg-[#53482F] shadow-sm;
-  }
-
-  .btn-luxury-gold {
-    @apply btn-luxury bg-[#B89B5E] text-[#151515] font-semibold hover:bg-[#A88B4E] shadow-sm;
-  }
-
-  .btn-luxury-outline {
-    @apply btn-luxury bg-transparent border border-[#151515] text-[#151515] hover:bg-[#151515] hover:text-white;
-  }
-
-  .btn-luxury-soft {
-    @apply btn-luxury bg-[#F7F4EE] border border-[#E5E0D5] text-[#151515] hover:bg-[#EFECE4];
-  }
-
-  /* Backward compatibility aliases */
-  .btn-pill {
-    @apply btn-luxury;
-  }
-  .btn-pill-primary {
-    @apply btn-luxury-primary;
-  }
-  .btn-pill-secondary {
-    @apply btn-luxury-secondary;
-  }
-  .btn-pill-outline {
-    @apply btn-luxury-outline;
-  }
-  .btn-pill-soft {
-    @apply btn-luxury-soft;
-  }
-
-  /* Luxury Card styles: crisp white stage, delicate 1px border */
-  .card-luxury {
-    @apply bg-white rounded-2xl p-5 md:p-6 border border-[#E5E0D5] shadow-luxury transition-all duration-300 hover:shadow-luxury-hover hover:border-[#D5CEBF];
-  }
-  .card-stitch {
-    @apply card-luxury;
-  }
-
-  /* Minimalist Luxury Header Glass */
-  .header-glass {
-    @apply bg-white/95 backdrop-blur-md border-b border-[#E5E0D5] shadow-[0_1px_8px_rgba(21,21,21,0.03)];
-  }
-
-  /* Editorial Stage Container */
-  .editorial-stage {
-    @apply bg-[#F7F4EE] border border-[#E5E0D5] rounded-3xl p-6 sm:p-10 relative overflow-hidden;
-  }
-
-  /* Minimalist Luxury Circular Spinner */
-  .luxury-spinner {
-    @apply w-10 h-10 rounded-full border-2 border-[#E5E0D5] border-t-[#6E603F] animate-spin inline-block;
-  }
+  .btn-luxury { @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-medium transition-all duration-300 active:scale-[.98] disabled:pointer-events-none disabled:opacity-40; }
+  .btn-luxury-primary { @apply btn-luxury bg-[#171716] text-white shadow-sm hover:bg-[#2c2c29] hover:shadow-lg; }
+  .btn-luxury-secondary { @apply btn-luxury bg-[#6e603f] text-white shadow-sm hover:bg-[#53482f]; }
+  .btn-luxury-gold { @apply btn-luxury bg-[#d4b676] font-bold text-[#171716] shadow-[0_10px_28px_rgba(212,182,118,.18)] hover:bg-[#e2ca96] hover:shadow-[0_14px_34px_rgba(212,182,118,.26)]; }
+  .btn-luxury-outline { @apply btn-luxury border border-[#171716] bg-transparent text-[#171716] hover:bg-[#171716] hover:text-white; }
+  .btn-luxury-soft { @apply btn-luxury border border-[#e5e0d5] bg-white text-[#171716] hover:bg-[#eee9df]; }
+  .btn-hero-ghost { @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/[.04] text-white transition-all duration-300 hover:border-white/40 hover:bg-white/10; }
+  .eyebrow { @apply text-[11px] font-bold uppercase tracking-[.16em] text-[#907744]; }
+  .category-pill { @apply inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-full border border-[#e5e0d5] bg-white px-4 text-xs font-semibold text-[#817b70] transition-all hover:border-[#171716] hover:text-[#171716]; }
+  .category-pill span { @apply rounded-full bg-[#f7f4ee] px-1.5 py-0.5 text-[10px]; }
+  .category-pill-active { @apply border-[#171716] bg-[#171716] text-white hover:bg-[#2c2c29] hover:text-white; }
+  .category-pill-active span { @apply bg-white/10 text-white; }
+  .card-luxury { @apply rounded-2xl border border-[#e5e0d5] bg-white p-5 shadow-luxury transition-all duration-300 hover:border-[#d5cebf] hover:shadow-luxury-hover; }
+  .header-glass { @apply border-b border-[#e5e0d5]/80 bg-[#f7f4ee]/90 backdrop-blur-xl; }
 }
 
-/* Subtle, refined scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
+.hero-panel { isolation: isolate; }
+.hero-grid { position: absolute; inset: 0; opacity: .16; background-image: linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px); background-size: 58px 58px; mask-image: linear-gradient(to bottom, black, transparent 90%); }
+.hero-glow { position: absolute; border-radius: 9999px; filter: blur(10px); pointer-events: none; }
+.hero-glow-one { width: 420px; height: 420px; top: -180px; left: 8%; background: rgba(184,155,94,.15); }
+.hero-glow-two { width: 360px; height: 360px; right: -150px; bottom: -180px; background: rgba(184,155,94,.1); }
+.editorial-card { box-shadow: inset 0 1px 0 rgba(255,255,255,.7); }
+.trust-ribbon { box-shadow: 0 12px 35px rgba(38,31,20,.04); }
 
-::-webkit-scrollbar-track {
-  background: #F7F4EE;
-}
+@keyframes fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes float-slow { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-10px) rotate(1deg); } }
+.animate-fade-up { animation: fade-up .65s cubic-bezier(.2,.7,.2,1) both; }
+.animate-float-slow { animation: float-slow 6s ease-in-out infinite; }
 
-::-webkit-scrollbar-thumb {
-  background: #D5CEBF;
-  border-radius: 9999px;
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--paper); }
+::-webkit-scrollbar-thumb { background: #d5cebf; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #b8b2a6; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #B8B2A6;
-}
-
-/* Respect user preferences for reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  ::before,
-  ::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
+  *, ::before, ::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
